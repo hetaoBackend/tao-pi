@@ -9,6 +9,7 @@ node_modules/
 # Pi runtime session data
 .pi-sessions/
 .pi-sessions.sqlite*
+.pi-memory/
 
 # Local learning snippets
 examples/

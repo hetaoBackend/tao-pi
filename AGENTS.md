@@ -17,11 +17,11 @@ Keep the source tree organized by runtime responsibility:
 
 ## Commands
 
-- `npm test` runs the Vitest suite.
-- `npm run typecheck` runs TypeScript without emitting files.
-- `npm run dev -- [options] [prompt]` starts the CLI through `tsx src/index.ts`.
+- `bun run test` runs the Vitest suite.
+- `bun run typecheck` runs TypeScript without emitting files.
+- `bun run dev -- [options] [prompt]` starts the CLI through `tsx src/index.ts`.
 
-Run `npm test` and `npm run typecheck` before claiming changes are complete.
+Run `bun run test` and `bun run typecheck` before claiming changes are complete.
 
 ## Architecture rules
 

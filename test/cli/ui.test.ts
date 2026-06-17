@@ -11,6 +11,9 @@ describe("cli ui", () => {
       historyMessages: 4,
       dbPath: ".pi-sessions.sqlite",
       workspaceRoot: "/Users/taohe/Documents/learning-pi",
+      toolNames: ["todo_read", "todo_write", "list_files", "bash"],
+      pluginIds: ["todo"],
+      projectContextFiles: ["AGENTS.md", "CLAUDE.md"],
       debug: false,
     });
 
@@ -18,7 +21,9 @@ describe("cli ui", () => {
     expect(text).toContain("cwd      /Users/taohe/Documents/learning-pi");
     expect(text).toContain("model    deepseek/ark-code-latest");
     expect(text).toContain("session  session-123 (resumed, 4 messages)");
-    expect(text).toContain("tools    read_file, write_file, web_search, web_fetch");
+    expect(text).toContain("tools    todo_read, todo_write, list_files, bash");
+    expect(text).toContain("plugins  todo");
+    expect(text).toContain("context  AGENTS.md, CLAUDE.md");
     expect(text).toContain("Type /help for commands, /exit to quit.");
     expect(text).not.toContain("hook");
   });
@@ -32,6 +37,9 @@ describe("cli ui", () => {
         dbPath: ".pi-sessions.sqlite",
         workspaceRoot: "/tmp/project",
         modelLabel: "openai/gpt-4.1-mini",
+        toolNames: ["list_files", "read_file"],
+        pluginIds: [],
+        projectContextFiles: [],
       }),
     ).toBe(
       [
@@ -41,7 +49,9 @@ describe("cli ui", () => {
         "  history  0 messages",
         "  model    openai/gpt-4.1-mini",
         "  db       .pi-sessions.sqlite",
-        "  tools    read_file, write_file, web_search, web_fetch",
+        "  tools    list_files, read_file",
+        "  plugins  none",
+        "  context  none",
         "  root     /tmp/project",
         "",
       ].join("\n"),
@@ -49,7 +59,10 @@ describe("cli ui", () => {
   });
 
   it("renders discoverable help with Claude-style aliases", () => {
-    const text = renderCliHelp("tsx src/index.ts");
+    const text = renderCliHelp("tsx src/index.ts", [
+      { name: "research", description: "Research a topic." },
+      { name: "review", description: "Review changes." },
+    ]);
 
     expect(text).toContain("Usage: tsx src/index.ts [options] [prompt]");
     expect(text).toContain("-p, --print");
@@ -58,5 +71,8 @@ describe("cli ui", () => {
     expect(text).toContain("--model <model>");
     expect(text).toContain("FIRECRAWL_API_KEY");
     expect(text).toContain("/session");
+    expect(text).toContain("Plugin commands:");
+    expect(text).toContain("  /research                    Research a topic.");
+    expect(text).toContain("  /review                      Review changes.");
   });
 });

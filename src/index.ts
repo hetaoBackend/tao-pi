@@ -5,12 +5,16 @@ import { createInterface } from "node:readline/promises";
 import { join } from "node:path";
 import { createTransformContext, prefixLatestUserTextMessage } from "./agent/context-transform.js";
 import { resolveConfiguredModel } from "./agent/model-config.js";
+import { loadProjectContext } from "./agent/project-context.js";
 import { runStreamingPrompt } from "./agent/streaming-prompt.js";
 import { buildSystemPrompt } from "./agent/system-prompt.js";
 import { parseCliArgs } from "./cli/args.js";
 import { runMultiTurnConversation } from "./cli/conversation.js";
 import { renderCliHelp, renderSessionSummary, renderWelcome } from "./cli/ui.js";
 import { SqliteSessionStore } from "./persistence/session-store.js";
+import { createConfiguredPlugins } from "./plugins/default-plugins.js";
+import { createAgentPluginRuntime } from "./plugins/plugin-registry.js";
+import { createCommandTools } from "./tools/command-tools.js";
 import { createFileTools } from "./tools/file-tools.js";
 import { createFirecrawlTools } from "./tools/firecrawl-tools.js";
 
@@ -41,13 +45,26 @@ async function main(): Promise<void> {
   const promptTimeZone = process.env.PI_TIMEZONE;
   const debug = cliArgs.debug || process.env.PI_DEBUG?.toLowerCase() === "true";
   const modelLabel = `${provider}/${modelId}`;
+  const projectContext = await loadProjectContext({ workspaceRoot });
+  const projectContextFiles = projectContext.map((entry) => entry.path);
+  const pluginRuntime = createAgentPluginRuntime(
+    createConfiguredPlugins({
+      workspaceRoot,
+      configuredPluginIds: process.env.PI_PLUGINS,
+      memoryDir: process.env.PI_MEMORY_DIR,
+      skillDirs: parsePathList(process.env.PI_SKILLS_DIRS),
+    }),
+  );
   const tools = [
+    ...pluginRuntime.tools,
     ...createFileTools(workspaceRoot),
+    ...createCommandTools(workspaceRoot),
     ...createFirecrawlTools({
       apiKey: process.env.FIRECRAWL_API_KEY,
       baseUrl: process.env.FIRECRAWL_BASE_URL,
     }),
   ];
+  const toolNames = tools.map((tool) => tool.name);
 
   const model = resolveConfiguredModel({
     provider,
@@ -75,7 +92,11 @@ async function main(): Promise<void> {
 
   const agent = new Agent({
     initialState: {
-      systemPrompt: buildSystemPrompt({ timeZone: promptTimeZone }),
+      systemPrompt: buildSystemPrompt({
+        timeZone: promptTimeZone,
+        projectContext,
+        pluginPromptSections: pluginRuntime.systemPromptSections,
+      }),
       model,
       tools,
       messages: session.messages,
@@ -127,6 +148,9 @@ async function main(): Promise<void> {
         historyMessages: session.messages.length,
         dbPath: sessionDbPath,
         workspaceRoot,
+        toolNames,
+        pluginIds: pluginRuntime.pluginIds,
+        projectContextFiles,
         debug,
       }),
     );
@@ -153,7 +177,7 @@ async function main(): Promise<void> {
       output: stdout,
       beforeTurnStart,
       afterTurn: saveCurrentSession,
-      helpText: () => renderCliHelp(commandName),
+      helpText: () => renderCliHelp(commandName, pluginRuntime.slashCommands),
       sessionText: () =>
         renderSessionSummary({
           sessionId: session.id,
@@ -162,7 +186,11 @@ async function main(): Promise<void> {
           dbPath: sessionDbPath,
           workspaceRoot,
           modelLabel,
+          toolNames,
+          pluginIds: pluginRuntime.pluginIds,
+          projectContextFiles,
         }),
+      slashCommands: pluginRuntime.slashCommands,
     });
   } finally {
     readline.close();
@@ -177,6 +205,17 @@ function parseOptionalBooleanCompat(key: string, value: string | undefined): Rec
   return {
     [key]: value.toLowerCase() === "true",
   };
+}
+
+function parsePathList(value: string | undefined): string[] {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(":")
+    .map((path) => path.trim())
+    .filter(Boolean);
 }
 
 async function readPipedStdin(): Promise<string> {
