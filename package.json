@@ -1,0 +1,23 @@
+{
+  "name": "learning-pi",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@earendil-works/pi-agent-core": "0.79.6",
+    "@earendil-works/pi-ai": "0.79.6",
+    "@types/sql.js": "1.4.11",
+    "sql.js": "1.14.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.0.3",
+    "tsx": "4.20.3",
+    "typescript": "5.8.3",
+    "vitest": "3.2.4"
+  }
+}
