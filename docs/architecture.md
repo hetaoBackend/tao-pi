@@ -5,7 +5,7 @@
 The project is a small TypeScript general-purpose agent CLI with five main runtime responsibilities:
 
 - `agent`: model selection, system prompt construction, context transforms, and streamed event rendering
-- `cli`: argument parsing, terminal text, slash commands, and the interactive loop
+- `cli`: argument parsing, terminal text, slash commands, the interactive TUI, and the plain fallback loop
 - `tools`: core agent tool adapters for workspace files, local commands, and Firecrawl
 - `plugins`: optional non-core capabilities that can contribute tools and system-prompt guidance
 - `persistence`: SQLite-backed session storage
@@ -20,6 +20,8 @@ The minimal base agent includes the core local loop directly, not as plugins:
 - Firecrawl-backed web search and fetch tools
 
 The prompt should keep the model on that local loop: prefer dedicated file and search tools over shell commands when they fit, and report code locations as `file_path:line_number` so terminal renderers can make them clickable.
+
+Interactive TTY sessions use an Ink-based TUI under `src/cli/tui/`. The TUI is the only framework-backed surface in the repo: `--print` and non-TTY fallback still use plain stream rendering. The TUI subscribes to existing agent events, renders message/tool/todo state, and uses `Agent.steer()` for text submitted while a run is already streaming.
 
 Non-core features should be added as plugins first. A plugin has an id, optional tools, optional prompt guidance, and optional interactive slash commands. For now, the only default plugins are `todo`, `memory`, and `skills`; do not add task runners or subagents yet. The runtime loads configured plugins through `PI_PLUGINS`, defaults to `todo,memory,skills`, and accepts `PI_PLUGINS=none` when a minimal core toolset is desired. The memory plugin stores file-backed memories under `PI_MEMORY_DIR`, defaulting to `.pi-memory` in the workspace, loads `MEMORY.md` into prompt guidance when present, and intentionally exposes no memory-specific tools; the agent uses the ordinary file tools to inspect or edit memory files. The skills plugin discovers local `SKILL.md` files from `~/.tao/skills` and the workspace `.tao/skills` directory by default, can be pointed at additional roots through `PI_SKILLS_DIRS`, lets later roots override earlier same-name skills, advertises discovered skills directly in prompt guidance, exposes `skill_read` for loading a specific full `SKILL.md`, and contributes `/<skill-name>` slash commands so the user can explicitly invoke a skill while the agent still reads the full `SKILL.md` before following it.
 
@@ -37,6 +39,17 @@ src/
 ├── cli/
 │   ├── args.ts
 │   ├── conversation.ts
+│   ├── runtime-mode.ts
+│   ├── tui/
+│   │   ├── app.tsx
+│   │   ├── command-registry.ts
+│   │   ├── components/
+│   │   ├── index.tsx
+│   │   ├── input-editor.ts
+│   │   ├── input-history.ts
+│   │   ├── message-format.ts
+│   │   ├── theme.ts
+│   │   └── view-state.ts
 │   └── ui.ts
 ├── persistence/
 │   └── session-store.ts
@@ -78,4 +91,4 @@ Deepen it later by concentrating "load latest, load explicit, or create fresh" b
 - Do not introduce interfaces for only one adapter.
 - Do not move environment parsing into many small files.
 - Do not split tool formatting helpers out of their adapters unless another adapter reuses them.
-- Do not add a framework. The current direct TypeScript modules are enough.
+- Do not add frameworks outside the interactive TUI. Ink is allowed for `src/cli/tui/`; the agent runtime, tool adapters, persistence, and plain text fallback should remain direct TypeScript modules.
