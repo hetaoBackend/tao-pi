@@ -6,10 +6,11 @@ export interface WelcomeOptions {
   historyMessages: number;
   dbPath: string;
   workspaceRoot: string;
+  toolNames: string[];
+  pluginIds: string[];
+  projectContextFiles: string[];
   debug: boolean;
 }
-
-const TOOL_NAMES = "read_file, write_file, web_search, web_fetch";
 
 export interface SessionSummaryOptions {
   sessionId: string;
@@ -18,6 +19,14 @@ export interface SessionSummaryOptions {
   dbPath: string;
   workspaceRoot: string;
   modelLabel: string;
+  toolNames: string[];
+  pluginIds: string[];
+  projectContextFiles: string[];
+}
+
+export interface HelpSlashCommand {
+  name: string;
+  description: string;
 }
 
 export function renderWelcome(options: WelcomeOptions): string {
@@ -27,7 +36,9 @@ export function renderWelcome(options: WelcomeOptions): string {
     `  cwd      ${options.cwd}`,
     `  model    ${options.modelLabel}`,
     `  session  ${options.sessionId} (${options.sessionMode}, ${formatMessages(options.historyMessages)})`,
-    `  tools    ${TOOL_NAMES}`,
+    `  tools    ${formatList(options.toolNames)}`,
+    `  plugins  ${formatList(options.pluginIds)}`,
+    `  context  ${formatProjectContextFiles(options.projectContextFiles)}`,
     `  root     ${options.workspaceRoot}`,
     `  db       ${options.dbPath}`,
     `  debug    ${options.debug ? "on" : "off"}`,
@@ -45,14 +56,16 @@ export function renderSessionSummary(options: SessionSummaryOptions): string {
     `  history  ${formatMessages(options.historyMessages)}`,
     `  model    ${options.modelLabel}`,
     `  db       ${options.dbPath}`,
-    `  tools    ${TOOL_NAMES}`,
+    `  tools    ${formatList(options.toolNames)}`,
+    `  plugins  ${formatList(options.pluginIds)}`,
+    `  context  ${formatProjectContextFiles(options.projectContextFiles)}`,
     `  root     ${options.workspaceRoot}`,
     "",
   ].join("\n");
 }
 
-export function renderCliHelp(commandName: string): string {
-  return [
+export function renderCliHelp(commandName: string, slashCommands: readonly HelpSlashCommand[] = []): string {
+  const lines = [
     `Usage: ${commandName} [options] [prompt]`,
     "",
     "Starts an interactive session by default. Use -p/--print for one-shot output.",
@@ -77,9 +90,31 @@ export function renderCliHelp(commandName: string): string {
     "  /clear                       Clear the terminal",
     "  /exit                        Exit the session",
     "",
-  ].join("\n");
+  ];
+
+  if (slashCommands.length) {
+    lines.push(
+      "Plugin commands:",
+      ...slashCommands.map((command) => `  /${padCommandName(command.name)} ${command.description}`),
+      "",
+    );
+  }
+
+  return lines.join("\n");
 }
 
 function formatMessages(count: number): string {
   return count === 1 ? "1 message" : `${count} messages`;
+}
+
+function formatProjectContextFiles(files: string[]): string {
+  return formatList(files);
+}
+
+function formatList(values: string[]): string {
+  return values.length ? values.join(", ") : "none";
+}
+
+function padCommandName(commandName: string): string {
+  return commandName.padEnd(27, " ");
 }

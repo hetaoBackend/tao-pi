@@ -80,4 +80,47 @@ describe("runMultiTurnConversation", () => {
       "help text\nsession text\n\u001BcUnknown command: /nope\nType /help for available commands.\n",
     );
   });
+
+  it("runs plugin slash commands as model turns", async () => {
+    const output = new MemoryWriter();
+    const inputs = ["/research compare local options", "/exit"];
+    const prompts: string[] = [];
+    let savedTurns = 0;
+    let listener: ((event: unknown) => void) | undefined;
+
+    const agent = {
+      subscribe(callback: (event: unknown) => void) {
+        listener = callback;
+        return () => {
+          listener = undefined;
+        };
+      },
+      async prompt(input: string) {
+        prompts.push(input);
+        listener?.({
+          type: "message_update",
+          assistantMessageEvent: { type: "text_delta", delta: "researched" },
+        });
+      },
+    };
+
+    await runMultiTurnConversation(agent, {
+      ask: async () => inputs.shift(),
+      output,
+      slashCommands: [
+        {
+          name: "research",
+          description: "Research a topic.",
+          toPrompt: ({ args }) => `Use research skill: ${args}`,
+        },
+      ],
+      afterTurn: async () => {
+        savedTurns += 1;
+      },
+    });
+
+    expect(prompts).toEqual(["Use research skill: compare local options"]);
+    expect(savedTurns).toBe(1);
+    expect(output.chunks.join("")).toBe("researched\n");
+  });
 });
