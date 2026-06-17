@@ -39,6 +39,7 @@ export type TuiViewAction =
   | { type: "tool_execution_update"; toolCallId: string; toolName: string; args?: unknown; partialResult: unknown }
   | { type: "tool_execution_end"; toolCallId: string; toolName: string; result: unknown; isError: boolean }
   | { type: "steer_queued"; text: string }
+  | { type: "clear_rows" }
   | { type: "system_message"; text: string; tone?: "info" | "error" };
 
 export function createInitialTuiViewState(): TuiViewState {
@@ -82,6 +83,8 @@ export function reduceTuiViewState(state: TuiViewState, action: TuiViewAction): 
     }
     case "steer_queued":
       return appendRow(state, { kind: "steering", text: action.text });
+    case "clear_rows":
+      return { ...state, rows: [], latestTodos: [] };
     case "system_message":
       return appendRow(state, { kind: "system", text: action.text, tone: action.tone });
     default:

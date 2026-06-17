@@ -72,4 +72,17 @@ describe("tui view state", () => {
 
     expect(state.rows).toEqual([{ kind: "assistant", text: "model failed", error: true }]);
   });
+
+  it("clears visible rows without changing streaming state", () => {
+    const withRow = reduceTuiViewState({ ...createInitialTuiViewState(), streaming: true }, {
+      type: "system_message",
+      text: "hello",
+    });
+
+    expect(reduceTuiViewState(withRow, { type: "clear_rows" })).toEqual({
+      streaming: true,
+      rows: [],
+      latestTodos: [],
+    });
+  });
 });
