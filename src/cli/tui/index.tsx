@@ -116,8 +116,9 @@ function RuntimeApp(options: RunTuiConversationOptions) {
   }, []);
 
   const clear = useCallback(() => {
+    options.output.write("\u001Bc");
     dispatch({ type: "clear_rows" });
-  }, [dispatch]);
+  }, [dispatch, options.output]);
 
   const controllerOptions = useMemo<TuiControllerOptions>(
     () => ({

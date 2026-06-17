@@ -100,6 +100,20 @@ describe("tui runtime helpers", () => {
       { type: "system_message", text: "session details", tone: "info" },
     ]);
   });
+
+  it("handles clear locally", async () => {
+    const calls: string[] = [];
+    const agent = createAgent({ isStreaming: false });
+
+    await handleTuiInput(
+      "/clear",
+      createOptions(agent, {
+        clear: () => calls.push("clear"),
+      }),
+    );
+
+    expect(calls).toEqual(["clear"]);
+  });
 });
 
 function createOptions(

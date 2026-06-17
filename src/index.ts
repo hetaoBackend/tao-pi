@@ -153,35 +153,39 @@ async function main(): Promise<void> {
       stdoutIsTTY: Boolean(stdout.isTTY),
     })
   ) {
-    const { runTuiConversation } = await import("./cli/tui/index.js");
-    await runTuiConversation({
-      agent,
-      output: stdout,
-      modelLabel,
-      sessionId: session.id,
-      sessionMode,
-      workspaceRoot,
-      toolNames,
-      pluginIds: pluginRuntime.pluginIds,
-      projectContextFiles,
-      slashCommands: pluginRuntime.slashCommands,
-      firstPrompt: prompt || undefined,
-      helpText: () => renderCliHelp(commandName, pluginRuntime.slashCommands),
-      sessionText: () =>
-        renderSessionSummary({
-          sessionId: session.id,
-          sessionMode,
-          historyMessages: agent.state.messages.length,
-          dbPath: sessionDbPath,
-          workspaceRoot,
-          modelLabel,
-          toolNames,
-          pluginIds: pluginRuntime.pluginIds,
-          projectContextFiles,
-        }),
-      afterTurn: saveCurrentSession,
-    });
-    return;
+    try {
+      const { runTuiConversation } = await import("./cli/tui/index.js");
+      await runTuiConversation({
+        agent,
+        output: stdout,
+        modelLabel,
+        sessionId: session.id,
+        sessionMode,
+        workspaceRoot,
+        toolNames,
+        pluginIds: pluginRuntime.pluginIds,
+        projectContextFiles,
+        slashCommands: pluginRuntime.slashCommands,
+        firstPrompt: prompt || undefined,
+        helpText: () => renderCliHelp(commandName, pluginRuntime.slashCommands),
+        sessionText: () =>
+          renderSessionSummary({
+            sessionId: session.id,
+            sessionMode,
+            historyMessages: agent.state.messages.length,
+            dbPath: sessionDbPath,
+            workspaceRoot,
+            modelLabel,
+            toolNames,
+            pluginIds: pluginRuntime.pluginIds,
+            projectContextFiles,
+          }),
+        afterTurn: saveCurrentSession,
+      });
+      return;
+    } catch (error) {
+      stderr.write(`TUI unavailable: ${formatError(error)}\nFalling back to plain terminal mode.\n`);
+    }
   }
 
   stdout.write(
