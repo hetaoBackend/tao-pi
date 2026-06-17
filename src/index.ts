@@ -10,6 +10,7 @@ import { runStreamingPrompt } from "./agent/streaming-prompt.js";
 import { buildSystemPrompt } from "./agent/system-prompt.js";
 import { parseCliArgs } from "./cli/args.js";
 import { runMultiTurnConversation } from "./cli/conversation.js";
+import { shouldUseTui } from "./cli/runtime-mode.js";
 import { renderCliHelp, renderSessionSummary, renderWelcome } from "./cli/ui.js";
 import { SqliteSessionStore } from "./persistence/session-store.js";
 import { createConfiguredPlugins } from "./plugins/default-plugins.js";
@@ -138,32 +139,71 @@ async function main(): Promise<void> {
     throw new Error("--print requires a prompt or piped stdin");
   }
 
-  if (!cliArgs.print) {
-    stdout.write(
-      renderWelcome({
-        cwd: process.cwd(),
-        modelLabel,
-        sessionId: session.id,
-        sessionMode,
-        historyMessages: session.messages.length,
-        dbPath: sessionDbPath,
-        workspaceRoot,
-        toolNames,
-        pluginIds: pluginRuntime.pluginIds,
-        projectContextFiles,
-        debug,
-      }),
-    );
+  if (cliArgs.print) {
+    await runStreamingPrompt(agent, prompt, stdout, { beforeTurnStart });
+    await saveCurrentSession();
+    stdout.write("\n");
+    return;
   }
+
+  if (
+    shouldUseTui({
+      print: cliArgs.print,
+      stdinIsTTY: Boolean(stdin.isTTY),
+      stdoutIsTTY: Boolean(stdout.isTTY),
+    })
+  ) {
+    const { runTuiConversation } = await import("./cli/tui/index.js");
+    await runTuiConversation({
+      agent,
+      output: stdout,
+      modelLabel,
+      sessionId: session.id,
+      sessionMode,
+      workspaceRoot,
+      toolNames,
+      pluginIds: pluginRuntime.pluginIds,
+      projectContextFiles,
+      slashCommands: pluginRuntime.slashCommands,
+      firstPrompt: prompt || undefined,
+      helpText: () => renderCliHelp(commandName, pluginRuntime.slashCommands),
+      sessionText: () =>
+        renderSessionSummary({
+          sessionId: session.id,
+          sessionMode,
+          historyMessages: agent.state.messages.length,
+          dbPath: sessionDbPath,
+          workspaceRoot,
+          modelLabel,
+          toolNames,
+          pluginIds: pluginRuntime.pluginIds,
+          projectContextFiles,
+        }),
+      afterTurn: saveCurrentSession,
+    });
+    return;
+  }
+
+  stdout.write(
+    renderWelcome({
+      cwd: process.cwd(),
+      modelLabel,
+      sessionId: session.id,
+      sessionMode,
+      historyMessages: session.messages.length,
+      dbPath: sessionDbPath,
+      workspaceRoot,
+      toolNames,
+      pluginIds: pluginRuntime.pluginIds,
+      projectContextFiles,
+      debug,
+    }),
+  );
 
   if (prompt) {
     await runStreamingPrompt(agent, prompt, stdout, { beforeTurnStart });
     await saveCurrentSession();
     stdout.write("\n");
-  }
-
-  if (cliArgs.print) {
-    return;
   }
 
   const readline = createInterface({

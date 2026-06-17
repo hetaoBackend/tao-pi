@@ -18,6 +18,7 @@ describe("tui runtime helpers", () => {
     expect(createUserTextMessage("focus on tests")).toEqual({
       role: "user",
       content: [{ type: "text", text: "focus on tests" }],
+      timestamp: expect.any(Number),
     });
   });
 

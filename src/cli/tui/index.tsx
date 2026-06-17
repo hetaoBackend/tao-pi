@@ -19,6 +19,7 @@ import {
 export interface UserTextMessage {
   role: "user";
   content: Array<{ type: "text"; text: string }>;
+  timestamp: number;
 }
 
 export interface TuiControllerAgent {
@@ -62,7 +63,7 @@ export function shouldSteer(isStreaming: boolean): boolean {
 }
 
 export function createUserTextMessage(text: string): UserTextMessage {
-  return { role: "user", content: [{ type: "text", text }] };
+  return { role: "user", content: [{ type: "text", text }], timestamp: Date.now() };
 }
 
 export async function handleTuiInput(rawInput: string, options: TuiControllerOptions): Promise<void> {
