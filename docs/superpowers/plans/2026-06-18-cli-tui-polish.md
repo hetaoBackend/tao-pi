@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build an Ink-based interactive TUI for Pi Agent that reaches the same class of experience as MagicCube/helixent while preserving plain `--print` mode and adding first-class `Agent.steer()` behavior.
+**Goal:** Build an Ink-based interactive TUI for TaoPi that reaches the same class of experience as MagicCube/helixent while preserving plain `--print` mode and adding first-class `Agent.steer()` behavior.
 
 **Architecture:** Keep `src/index.ts` as the composition root and add a focused `src/cli/tui/` surface. Pure modules handle command resolution, editing, history, event reduction, message formatting, and todo extraction; Ink components render those view models. A small TUI runtime bridge decides whether a submitted input starts `agent.prompt()` or queues `agent.steer()`.
 

@@ -8,7 +8,7 @@ import { createSkillsPlugin, discoverSkills } from "../../src/plugins/skills-plu
 let skillsRoot: string;
 
 beforeEach(async () => {
-  skillsRoot = await mkdtemp(join(tmpdir(), "learning-pi-skills-plugin-"));
+  skillsRoot = await mkdtemp(join(tmpdir(), "tao-pi-skills-plugin-"));
 });
 
 afterEach(async () => {
@@ -65,7 +65,7 @@ describe("discoverSkills", () => {
   });
 
   it("lets later skill directories override earlier skills with the same name", async () => {
-    const overrideRoot = await mkdtemp(join(tmpdir(), "learning-pi-skills-plugin-override-"));
+    const overrideRoot = await mkdtemp(join(tmpdir(), "tao-pi-skills-plugin-override-"));
     writeSkill("review", [
       "---",
       "name: review",

@@ -36,7 +36,7 @@ describe("createConfiguredPlugins", () => {
   });
 
   it("passes configured skill directories to the skills plugin", () => {
-    const skillsRoot = mkdtempSync(join(tmpdir(), "learning-pi-default-skills-"));
+    const skillsRoot = mkdtempSync(join(tmpdir(), "tao-pi-default-skills-"));
     mkdirSync(join(skillsRoot, "research"), { recursive: true });
     writeFileSync(
       join(skillsRoot, "research", "SKILL.md"),
@@ -59,8 +59,8 @@ describe("createConfiguredPlugins", () => {
   });
 
   it("discovers global Tao skills by default", () => {
-    const homeDir = mkdtempSync(join(tmpdir(), "learning-pi-home-skills-"));
-    const workspaceRoot = mkdtempSync(join(tmpdir(), "learning-pi-workspace-skills-"));
+    const homeDir = mkdtempSync(join(tmpdir(), "tao-pi-home-skills-"));
+    const workspaceRoot = mkdtempSync(join(tmpdir(), "tao-pi-workspace-skills-"));
     mkdirSync(join(homeDir, ".tao", "skills", "research"), { recursive: true });
     writeFileSync(
       join(homeDir, ".tao", "skills", "research", "SKILL.md"),
@@ -83,7 +83,7 @@ describe("createConfiguredPlugins", () => {
   });
 
   it("discovers workspace Tao skills by default", () => {
-    const workspaceRoot = mkdtempSync(join(tmpdir(), "learning-pi-workspace-skills-"));
+    const workspaceRoot = mkdtempSync(join(tmpdir(), "tao-pi-workspace-skills-"));
     mkdirSync(join(workspaceRoot, ".tao", "skills", "research"), { recursive: true });
     writeFileSync(
       join(workspaceRoot, ".tao", "skills", "research", "SKILL.md"),
@@ -104,8 +104,8 @@ describe("createConfiguredPlugins", () => {
   });
 
   it("does not discover Claude-style project skills by default", () => {
-    const homeDir = mkdtempSync(join(tmpdir(), "learning-pi-home-skills-"));
-    const workspaceRoot = mkdtempSync(join(tmpdir(), "learning-pi-claude-skills-"));
+    const homeDir = mkdtempSync(join(tmpdir(), "tao-pi-home-skills-"));
+    const workspaceRoot = mkdtempSync(join(tmpdir(), "tao-pi-claude-skills-"));
     mkdirSync(join(workspaceRoot, ".claude", "skills", "research"), { recursive: true });
     writeFileSync(
       join(workspaceRoot, ".claude", "skills", "research", "SKILL.md"),
@@ -128,8 +128,8 @@ describe("createConfiguredPlugins", () => {
   });
 
   it("lets workspace Tao skills override same-name global Tao skills", () => {
-    const homeDir = mkdtempSync(join(tmpdir(), "learning-pi-home-skill-override-"));
-    const workspaceRoot = mkdtempSync(join(tmpdir(), "learning-pi-skill-override-"));
+    const homeDir = mkdtempSync(join(tmpdir(), "tao-pi-home-skill-override-"));
+    const workspaceRoot = mkdtempSync(join(tmpdir(), "tao-pi-skill-override-"));
     mkdirSync(join(homeDir, ".tao", "skills", "review"), { recursive: true });
     mkdirSync(join(workspaceRoot, ".tao", "skills", "review"), { recursive: true });
     writeFileSync(
@@ -160,9 +160,9 @@ describe("createConfiguredPlugins", () => {
   });
 
   it("does not discover main-repository Claude-style skills when running in a git worktree", () => {
-    const homeDir = mkdtempSync(join(tmpdir(), "learning-pi-home-worktree-skills-"));
-    const mainRepositoryRoot = mkdtempSync(join(tmpdir(), "learning-pi-main-repo-skills-"));
-    const worktreeRoot = mkdtempSync(join(tmpdir(), "learning-pi-worktree-skills-"));
+    const homeDir = mkdtempSync(join(tmpdir(), "tao-pi-home-worktree-skills-"));
+    const mainRepositoryRoot = mkdtempSync(join(tmpdir(), "tao-pi-main-repo-skills-"));
+    const worktreeRoot = mkdtempSync(join(tmpdir(), "tao-pi-worktree-skills-"));
     const worktreeGitDir = join(mainRepositoryRoot, ".git", "worktrees", "feature");
     mkdirSync(join(mainRepositoryRoot, ".claude", "skills", "review"), { recursive: true });
     mkdirSync(worktreeGitDir, { recursive: true });
@@ -189,7 +189,7 @@ describe("createConfiguredPlugins", () => {
   });
 
   it("resolves configured relative skill directories from the workspace root", () => {
-    const workspaceRoot = mkdtempSync(join(tmpdir(), "learning-pi-relative-skills-"));
+    const workspaceRoot = mkdtempSync(join(tmpdir(), "tao-pi-relative-skills-"));
     mkdirSync(join(workspaceRoot, ".agent-skills", "review"), { recursive: true });
     writeFileSync(
       join(workspaceRoot, ".agent-skills", "review", "SKILL.md"),
@@ -211,8 +211,8 @@ describe("createConfiguredPlugins", () => {
   });
 
   it("resolves configured tilde skill directories from the home directory", () => {
-    const homeDir = mkdtempSync(join(tmpdir(), "learning-pi-tilde-skills-"));
-    const workspaceRoot = mkdtempSync(join(tmpdir(), "learning-pi-tilde-workspace-"));
+    const homeDir = mkdtempSync(join(tmpdir(), "tao-pi-tilde-skills-"));
+    const workspaceRoot = mkdtempSync(join(tmpdir(), "tao-pi-tilde-workspace-"));
     mkdirSync(join(homeDir, ".tao", "skills", "review"), { recursive: true });
     writeFileSync(
       join(homeDir, ".tao", "skills", "review", "SKILL.md"),

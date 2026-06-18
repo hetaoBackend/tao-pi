@@ -31,7 +31,7 @@ export interface HelpSlashCommand {
 
 export function renderWelcome(options: WelcomeOptions): string {
   return [
-    "Pi Agent",
+    "TaoPi",
     "",
     `  cwd      ${options.cwd}`,
     `  model    ${options.modelLabel}`,

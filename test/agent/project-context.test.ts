@@ -7,7 +7,7 @@ import { formatProjectContext, loadProjectContext } from "../../src/agent/projec
 let workspaceRoot: string;
 
 beforeEach(async () => {
-  workspaceRoot = await mkdtemp(join(tmpdir(), "learning-pi-project-context-"));
+  workspaceRoot = await mkdtemp(join(tmpdir(), "tao-pi-project-context-"));
 });
 
 afterEach(async () => {

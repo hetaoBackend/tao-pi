@@ -7,7 +7,7 @@ import { createCommandTools } from "../../src/tools/command-tools.js";
 let workspaceRoot: string;
 
 beforeEach(async () => {
-  workspaceRoot = await mkdtemp(join(tmpdir(), "learning-pi-command-tools-"));
+  workspaceRoot = await mkdtemp(join(tmpdir(), "tao-pi-command-tools-"));
 });
 
 afterEach(async () => {

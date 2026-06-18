@@ -124,7 +124,7 @@ export function InputBox({ commands, streaming, onSubmit, onAbort }: InputBoxPro
     updateEditor(insertTextAtCursor(editor, input));
   });
 
-  const placeholder = streaming ? "steer current run" : "ask Pi Agent";
+  const placeholder = streaming ? "steer current run" : "ask TaoPi";
 
   return (
     <Box flexDirection="column">

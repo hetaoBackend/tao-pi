@@ -7,7 +7,7 @@ import { createFileTools } from "../../src/tools/file-tools.js";
 let workspaceRoot: string;
 
 beforeEach(async () => {
-  workspaceRoot = await mkdtemp(join(tmpdir(), "learning-pi-tools-"));
+  workspaceRoot = await mkdtemp(join(tmpdir(), "tao-pi-tools-"));
 });
 
 afterEach(async () => {

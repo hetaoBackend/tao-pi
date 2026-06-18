@@ -32,7 +32,7 @@ describe("tui components", () => {
       />,
     );
 
-    expect(header).toContain("Pi Agent");
+    expect(header).toContain("TaoPi");
     expect(header).toContain("openai/gpt-4.1-mini");
     expect(header).toContain("session-123");
     expect(footer).toContain("messages 3");

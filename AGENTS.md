@@ -2,7 +2,7 @@
 
 ## Project shape
 
-This repo is a TypeScript CLI for running a Pi agent with local file tools,
+TaoPi is a TypeScript CLI for running a Pi agent with local file tools,
 Firecrawl web tools, SQLite-backed sessions, and a Chinese system prompt.
 
 Keep the source tree organized by runtime responsibility:

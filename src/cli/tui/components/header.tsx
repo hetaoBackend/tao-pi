@@ -24,7 +24,7 @@ export function Header({
     <Box flexDirection="column" borderStyle="single" borderColor={tuiTheme.colors.border} paddingX={1}>
       <Box columnGap={1}>
         <Text color={tuiTheme.colors.primary} bold>
-          Pi Agent
+          TaoPi
         </Text>
         <Text color={tuiTheme.colors.dim}>{modelLabel}</Text>
       </Box>

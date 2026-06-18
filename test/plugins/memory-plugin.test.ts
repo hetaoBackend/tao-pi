@@ -7,7 +7,7 @@ import { createMemoryPlugin } from "../../src/plugins/memory-plugin.js";
 let memoryDir: string;
 
 beforeEach(async () => {
-  memoryDir = await mkdtemp(join(tmpdir(), "learning-pi-memory-plugin-"));
+  memoryDir = await mkdtemp(join(tmpdir(), "tao-pi-memory-plugin-"));
 });
 
 afterEach(async () => {

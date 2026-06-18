@@ -2,7 +2,7 @@
 
 ## Context
 
-The active goal is to evolve this Pi-based CLI into a capable general-purpose agent by using the latest Claude Code surface as a reference point. Claude Code 2.1.179 exposes a practical local work loop through file inspection, precise editing, shell execution, web lookup, and explicit verification habits.
+The active goal is to evolve TaoPi into a capable general-purpose agent by using the latest Claude Code surface as a reference point. Claude Code 2.1.179 exposes a practical local work loop through file inspection, precise editing, shell execution, web lookup, and explicit verification habits.
 
 This repository currently has session persistence, streaming CLI output, `read_file`, `write_file`, `web_search`, and `web_fetch`. The first approved slice adds the missing local workspace loop: inspect, edit, and verify.
 

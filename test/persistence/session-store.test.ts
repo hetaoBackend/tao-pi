@@ -8,7 +8,7 @@ import { SqliteSessionStore } from "../../src/persistence/session-store.js";
 let dbPath: string;
 
 beforeEach(() => {
-  dbPath = join(tmpdir(), `learning-pi-sessions-${randomUUID()}.sqlite`);
+  dbPath = join(tmpdir(), `tao-pi-sessions-${randomUUID()}.sqlite`);
 });
 
 afterEach(async () => {

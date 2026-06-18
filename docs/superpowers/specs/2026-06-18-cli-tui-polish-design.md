@@ -41,13 +41,13 @@ to the target reference.
 - Do not add subagents, task runners, or approval policy changes as part of this UI slice.
 - Do not make `--print` depend on Ink.
 - Do not attempt exact visual cloning of helixent branding. The target is the same level of
-  TUI capability and polish, adapted to Pi Agent.
+  TUI capability and polish, adapted to TaoPi.
 
 ## User Experience
 
 The interactive session opens with a compact header:
 
-- Pi Agent name and a small text logo.
+- TaoPi name and a small text logo.
 - Provider/model label.
 - Session id with `new` or `resumed` state.
 - Workspace root and project context file count.

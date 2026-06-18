@@ -4,21 +4,21 @@ import { renderCliHelp, renderSessionSummary, renderWelcome } from "../../src/cl
 describe("cli ui", () => {
   it("renders a compact Claude-style welcome panel with the active context", () => {
     const text = renderWelcome({
-      cwd: "/Users/taohe/Documents/learning-pi",
+      cwd: "/Users/taohe/Documents/tao-pi",
       modelLabel: "deepseek/ark-code-latest",
       sessionId: "session-123",
       sessionMode: "resumed",
       historyMessages: 4,
       dbPath: ".pi-sessions.sqlite",
-      workspaceRoot: "/Users/taohe/Documents/learning-pi",
+      workspaceRoot: "/Users/taohe/Documents/tao-pi",
       toolNames: ["todo_read", "todo_write", "list_files", "bash"],
       pluginIds: ["todo"],
       projectContextFiles: ["AGENTS.md", "CLAUDE.md"],
       debug: false,
     });
 
-    expect(text).toContain("Pi Agent");
-    expect(text).toContain("cwd      /Users/taohe/Documents/learning-pi");
+    expect(text).toContain("TaoPi");
+    expect(text).toContain("cwd      /Users/taohe/Documents/tao-pi");
     expect(text).toContain("model    deepseek/ark-code-latest");
     expect(text).toContain("session  session-123 (resumed, 4 messages)");
     expect(text).toContain("tools    todo_read, todo_write, list_files, bash");

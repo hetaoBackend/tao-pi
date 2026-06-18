@@ -2,7 +2,7 @@
 
 ## Current shape
 
-The project is a small TypeScript general-purpose agent CLI with five main runtime responsibilities:
+TaoPi is a small TypeScript general-purpose agent CLI with five main runtime responsibilities:
 
 - `agent`: model selection, system prompt construction, context transforms, and streamed event rendering
 - `cli`: argument parsing, terminal text, slash commands, the interactive TUI, and the plain fallback loop
