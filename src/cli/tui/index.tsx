@@ -219,6 +219,11 @@ function handleBuiltinSubmission(name: string, args: string, options: TuiControl
     return;
   }
 
+  if (name === "tool") {
+    handleToolSubmission(args, options);
+    return;
+  }
+
   if (name === "session") {
     options.dispatch({ type: "system_message", text: options.sessionText(), tone: "info" });
     return;
@@ -228,4 +233,20 @@ function handleBuiltinSubmission(name: string, args: string, options: TuiControl
     options.dispatch({ type: "system_message", text: formatTuiHelp(options.commands, args || undefined), tone: "info" });
     return;
   }
+}
+
+function handleToolSubmission(args: string, options: TuiControllerOptions): void {
+  const normalizedArgs = args.trim().toLowerCase();
+  if (normalizedArgs === "all") {
+    options.dispatch({ type: "toggle_tool_results" });
+    return;
+  }
+
+  const index = Number(normalizedArgs);
+  if (!Number.isInteger(index) || index < 1) {
+    options.dispatch({ type: "system_message", text: "Usage: /tool <number> or /tool all", tone: "error" });
+    return;
+  }
+
+  options.dispatch({ type: "toggle_tool_result_at_index", index });
 }

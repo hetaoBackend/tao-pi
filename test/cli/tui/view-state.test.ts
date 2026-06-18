@@ -159,6 +159,45 @@ describe("tui view state", () => {
     ]);
   });
 
+  it("toggles one foldable tool result by visible number", () => {
+    let state = createInitialTuiViewState();
+
+    state = reduceTuiViewState(state, {
+      type: "tool_execution_start",
+      toolCallId: "call-1",
+      toolName: "bash",
+      args: { command: "printf one" },
+    });
+    state = reduceTuiViewState(state, {
+      type: "tool_execution_end",
+      toolCallId: "call-1",
+      toolName: "bash",
+      isError: false,
+      result: { content: [{ type: "text", text: "one output" }] },
+    });
+    state = reduceTuiViewState(state, {
+      type: "tool_execution_start",
+      toolCallId: "call-2",
+      toolName: "bash",
+      args: { command: "printf two" },
+    });
+    state = reduceTuiViewState(state, {
+      type: "tool_execution_end",
+      toolCallId: "call-2",
+      toolName: "bash",
+      isError: false,
+      result: { content: [{ type: "text", text: "two output" }] },
+    });
+
+    const expanded = reduceTuiViewState(state, { type: "toggle_tool_result_at_index", index: 2 });
+
+    expect(expanded.rows).toMatchObject([
+      { kind: "tool", toolCallId: "call-1" },
+      { kind: "tool", toolCallId: "call-2", resultExpanded: true },
+    ]);
+    expect(expanded.rows[0]).not.toHaveProperty("resultExpanded", true);
+  });
+
   it("records steering rows separately from prompt rows", () => {
     const state = reduceTuiViewState(createInitialTuiViewState(), {
       type: "steer_queued",

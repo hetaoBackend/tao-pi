@@ -1,6 +1,6 @@
 import { Box, Text, useBoxMetrics, useInput } from "ink";
 import { useCallback, useEffect, useRef, type RefObject } from "react";
-import type { TuiRow } from "../view-state.js";
+import { isFoldableToolRow, type TuiRow } from "../view-state.js";
 import { tuiTheme } from "../theme.js";
 import { formatAssistantTextBlocks, type AssistantTextSpan } from "../message-format.js";
 import { getAbsoluteLayoutPosition } from "../layout.js";
@@ -35,28 +35,37 @@ export function MessageHistory({ rows, toolResultsExpanded = false, onToggleTool
     return null;
   }
 
+  let nextToolResultNumber = 0;
+
   return (
     <Box flexDirection="column" rowGap={1}>
-      {rows.map((row, index) => (
-        <MessageRow
-          key={`${row.kind}:${index}`}
-          row={row}
-          toolResultsExpanded={toolResultsExpanded}
-          onToggleToolResult={onToggleToolResult}
-          registerToolResultTarget={registerToolResultTarget}
-        />
-      ))}
+      {rows.map((row, index) => {
+        const toolResultNumber = isFoldableToolRow(row) ? ++nextToolResultNumber : undefined;
+
+        return (
+          <MessageRow
+            key={`${row.kind}:${index}`}
+            row={row}
+            toolResultNumber={toolResultNumber}
+            toolResultsExpanded={toolResultsExpanded}
+            onToggleToolResult={onToggleToolResult}
+            registerToolResultTarget={registerToolResultTarget}
+          />
+        );
+      })}
     </Box>
   );
 }
 
 function MessageRow({
   row,
+  toolResultNumber,
   toolResultsExpanded,
   onToggleToolResult,
   registerToolResultTarget,
 }: {
   row: TuiRow;
+  toolResultNumber?: number;
   toolResultsExpanded: boolean;
   onToggleToolResult?: (toolCallId: string) => void;
   registerToolResultTarget: (toolCallId: string, rectangle?: TerminalRectangle) => void;
@@ -82,6 +91,7 @@ function MessageRow({
       return (
         <ToolMessageRow
           row={row}
+          toolResultNumber={toolResultNumber}
           toolResultsExpanded={toolResultsExpanded}
           onToggleToolResult={onToggleToolResult}
           registerToolResultTarget={registerToolResultTarget}
@@ -103,11 +113,13 @@ function MessageRow({
 
 function ToolMessageRow({
   row,
+  toolResultNumber,
   toolResultsExpanded,
   onToggleToolResult,
   registerToolResultTarget,
 }: {
   row: ToolRow;
+  toolResultNumber?: number;
   toolResultsExpanded: boolean;
   onToggleToolResult?: (toolCallId: string) => void;
   registerToolResultTarget: (toolCallId: string, rectangle?: TerminalRectangle) => void;
@@ -155,6 +167,7 @@ function ToolMessageRow({
         <Text color={row.status === "error" ? tuiTheme.colors.error : tuiTheme.colors.dim}>
           {isFoldable ? (resultExpanded ? "v" : ">") : tuiTheme.symbols.tool}
         </Text>
+        {toolResultNumber ? <Text color={tuiTheme.colors.dim}>[{toolResultNumber}]</Text> : null}
         <Text>{row.title}</Text>
         <Text color={statusColor(row.status)}>{row.status}</Text>
       </Box>

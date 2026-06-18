@@ -160,6 +160,22 @@ describe("tui runtime helpers", () => {
     ]);
   });
 
+  it("handles targeted tool expansion locally", async () => {
+    const actions: TuiViewAction[] = [];
+    const calls: string[] = [];
+    const agent = createAgent({
+      isStreaming: false,
+      prompt: async (input) => {
+        calls.push(`prompt:${input}`);
+      },
+    });
+
+    await handleTuiInput("/tool 2", createOptions(agent, { dispatch: (action) => actions.push(action) }));
+
+    expect(calls).toEqual([]);
+    expect(actions).toEqual([{ type: "toggle_tool_result_at_index", index: 2 }]);
+  });
+
   it("handles clear locally", async () => {
     const calls: string[] = [];
     const agent = createAgent({ isStreaming: false });

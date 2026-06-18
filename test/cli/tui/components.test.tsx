@@ -190,6 +190,40 @@ describe("tui components", () => {
     expect(expanded).toContain("Search results for pi");
   });
 
+  it("numbers foldable tool results for targeted expansion", () => {
+    const output = renderToString(
+      <MessageHistory
+        rows={[
+          {
+            kind: "tool",
+            toolCallId: "call-1",
+            toolName: "bash",
+            title: "Run command",
+            detail: "printf one",
+            result: "one output",
+            fullResult: "one output",
+            resultTruncated: false,
+            status: "ok",
+          },
+          {
+            kind: "tool",
+            toolCallId: "call-2",
+            toolName: "bash",
+            title: "Run command",
+            detail: "printf two",
+            result: "two output",
+            fullResult: "two output",
+            resultTruncated: false,
+            status: "ok",
+          },
+        ]}
+      />,
+    );
+
+    expect(output).toContain("[1] Run command");
+    expect(output).toContain("[2] Run command");
+  });
+
   it("keeps write_file result previews visible by default", () => {
     const output = renderToString(
       <MessageHistory
