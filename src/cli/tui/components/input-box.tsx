@@ -26,10 +26,19 @@ export interface InputBoxProps {
   onToggleToolResults: () => void;
 }
 
-export interface InputCursorSegments {
+export interface InputTextSegments {
   before: string;
-  cursor: string;
   after: string;
+}
+
+export interface LayoutPosition {
+  left: number;
+  top: number;
+}
+
+export interface TerminalCursorPosition {
+  x: number;
+  y: number;
 }
 
 export function InputBox({ commands, streaming, onSubmit, onAbort, onToggleToolResults }: InputBoxProps) {
@@ -141,16 +150,9 @@ export function InputBox({ commands, streaming, onSubmit, onAbort, onToggleToolR
   const metrics = useBoxMetrics(inputRef);
   const { setCursorPosition } = useCursor();
 
-  // Position the terminal cursor for IME composition window
-  useMemo(() => {
-    if (metrics.hasMeasured) {
-      // Calculate cursor column: prompt symbol (1) + padding (1) + before text width
-      const beforeText = editor.text.slice(0, editor.cursorOffset);
-      const cursorX = 1 + 1 + stringWidth(beforeText);
-      const cursorY = metrics.top;
-      setCursorPosition({ x: cursorX, y: cursorY });
-    }
-  }, [metrics.hasMeasured, metrics.top, editor.cursorOffset, editor.text, setCursorPosition]);
+  if (metrics.hasMeasured) {
+    setCursorPosition(getInputCursorPosition(getAbsoluteLayoutPosition(inputRef.current), editor.text, editor.cursorOffset));
+  }
 
   return (
     <Box flexDirection="column">
@@ -164,12 +166,12 @@ export function InputBox({ commands, streaming, onSubmit, onAbort, onToggleToolR
 }
 
 function InputText({ editor, placeholder }: { editor: InputEditorState; placeholder: string }) {
-  const segments = getInputCursorSegments(editor.text, editor.cursorOffset);
+  const segments = getInputTextSegments(editor.text, editor.cursorOffset);
 
   if (!editor.text) {
     return (
       <Box>
-        <Text inverse>{segments.cursor}</Text>
+        <Text> </Text>
         <Text color={tuiTheme.colors.dim}>{placeholder}</Text>
       </Box>
     );
@@ -178,7 +180,6 @@ function InputText({ editor, placeholder }: { editor: InputEditorState; placehol
   return (
     <Box>
       <Text>{segments.before}</Text>
-      <Text inverse>{segments.cursor}</Text>
       <Text>{segments.after}</Text>
     </Box>
   );
@@ -188,14 +189,40 @@ export function isToggleToolResultsInput(input: string, key: { ctrl?: boolean })
   return Boolean(key.ctrl && input === "o");
 }
 
-export function getInputCursorSegments(text: string, cursorOffset: number): InputCursorSegments {
+export function getInputTextSegments(text: string, cursorOffset: number): InputTextSegments {
   const safeOffset = Math.max(0, Math.min(cursorOffset, text.length));
 
   return {
     before: text.slice(0, safeOffset),
-    cursor: text[safeOffset] ?? " ",
-    after: text.slice(safeOffset + 1),
+    after: text.slice(safeOffset),
   };
+}
+
+export function getInputCursorPosition(
+  inputBoxPosition: LayoutPosition,
+  text: string,
+  cursorOffset: number,
+): TerminalCursorPosition {
+  const beforeText = text.slice(0, Math.max(0, Math.min(cursorOffset, text.length)));
+  return {
+    x: inputBoxPosition.left + 4 + stringWidth(beforeText),
+    y: inputBoxPosition.top + 1,
+  };
+}
+
+export function getAbsoluteLayoutPosition(node: unknown): LayoutPosition {
+  let left = 0;
+  let top = 0;
+  let current = node;
+
+  while (isLayoutNode(current)) {
+    const layout = current.yogaNode?.getComputedLayout?.();
+    left += numberValue(layout?.left);
+    top += numberValue(layout?.top);
+    current = current.parentNode;
+  }
+
+  return { left, top };
 }
 
 /**
@@ -229,4 +256,19 @@ function stringWidth(text: string): number {
     }
   }
   return width;
+}
+
+interface LayoutNodeLike {
+  parentNode?: unknown;
+  yogaNode?: {
+    getComputedLayout?: () => { left?: unknown; top?: unknown };
+  };
+}
+
+function isLayoutNode(value: unknown): value is LayoutNodeLike {
+  return Boolean(value && typeof value === "object" && ("parentNode" in value || "yogaNode" in value));
+}
+
+function numberValue(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }

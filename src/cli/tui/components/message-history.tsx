@@ -1,6 +1,7 @@
 import { Box, Text } from "ink";
 import type { TuiRow } from "../view-state.js";
 import { tuiTheme } from "../theme.js";
+import { formatAssistantTextBlocks, type AssistantTextSpan } from "../message-format.js";
 
 export interface MessageHistoryProps {
   rows: readonly TuiRow[];
@@ -34,9 +35,9 @@ function MessageRow({ row, toolResultsExpanded }: { row: TuiRow; toolResultsExpa
       );
     case "assistant":
       return (
-        <Box columnGap={1}>
+        <Box columnGap={1} alignItems="flex-start">
           <Text color={row.error ? tuiTheme.colors.error : tuiTheme.colors.accent}>{tuiTheme.symbols.assistant}</Text>
-          <Text color={row.error ? tuiTheme.colors.error : undefined}>{row.text}</Text>
+          <AssistantMessageText text={row.text} error={row.error} />
         </Box>
       );
     case "tool":
@@ -66,6 +67,70 @@ function MessageRow({ row, toolResultsExpanded }: { row: TuiRow; toolResultsExpa
     default:
       return null;
   }
+}
+
+function AssistantMessageText({ text, error }: { text: string; error?: boolean }) {
+  if (!text) {
+    return <Text />;
+  }
+
+  if (error) {
+    return <Text color={tuiTheme.colors.error}>{text}</Text>;
+  }
+
+  return (
+    <Box flexDirection="column">
+      {formatAssistantTextBlocks(text).map((block, index) => {
+        switch (block.kind) {
+          case "heading":
+            return (
+              <Text key={index}>
+                <AssistantTextSpans spans={block.spans} forceStrong />
+              </Text>
+            );
+          case "paragraph":
+            return (
+              <Text key={index}>
+                <AssistantTextSpans spans={block.spans} />
+              </Text>
+            );
+          case "listItem":
+            return (
+              <Text key={index}>
+                <Text color={tuiTheme.colors.dim}>- </Text>
+                <AssistantTextSpans spans={block.spans} />
+              </Text>
+            );
+          case "codeBlock":
+            return (
+              <Text key={index} color={tuiTheme.colors.code}>
+                {block.spans.map((span) => span.text).join("")}
+              </Text>
+            );
+          case "blank":
+            return <Text key={index}> </Text>;
+          default:
+            return null;
+        }
+      })}
+    </Box>
+  );
+}
+
+function AssistantTextSpans({ spans, forceStrong = false }: { spans: readonly AssistantTextSpan[]; forceStrong?: boolean }) {
+  return (
+    <>
+      {spans.map((span, index) => (
+        <Text
+          key={index}
+          bold={forceStrong || span.style === "strong"}
+          color={span.style === "code" ? tuiTheme.colors.code : undefined}
+        >
+          {span.text}
+        </Text>
+      ))}
+    </>
+  );
 }
 
 function statusColor(status: "running" | "ok" | "error") {

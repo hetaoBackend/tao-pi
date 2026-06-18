@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatAssistantTextBlocks,
   formatToolArgs,
   formatToolResult,
   summarizeToolTitle,
@@ -40,5 +41,47 @@ describe("tui message format", () => {
     };
 
     expect(formatToolResult(result, 100)).toBe("Todos: 1 completed, 1 in progress, 1 pending");
+  });
+
+  it("formats assistant markdown into readable text blocks", () => {
+    const blocks = formatAssistantTextBlocks(
+      [
+        "## Fix",
+        "",
+        "One line - pass `onPreCompactionFlush` to `runCompaction()`.",
+        "- **Without** the fix: fails - `expected [] to have a length of 1`",
+        "- **With** the fix: passes",
+      ].join("\n"),
+    );
+
+    expect(blocks).toEqual([
+      { kind: "heading", spans: [{ text: "Fix", style: "strong" }] },
+      { kind: "blank" },
+      {
+        kind: "paragraph",
+        spans: [
+          { text: "One line - pass " },
+          { text: "onPreCompactionFlush", style: "code" },
+          { text: " to " },
+          { text: "runCompaction()", style: "code" },
+          { text: "." },
+        ],
+      },
+      {
+        kind: "listItem",
+        spans: [
+          { text: "Without", style: "strong" },
+          { text: " the fix: fails - " },
+          { text: "expected [] to have a length of 1", style: "code" },
+        ],
+      },
+      {
+        kind: "listItem",
+        spans: [
+          { text: "With", style: "strong" },
+          { text: " the fix: passes" },
+        ],
+      },
+    ]);
   });
 });

@@ -87,6 +87,33 @@ describe("tui components", () => {
     expect(output).toContain("focus on tests");
   });
 
+  it("renders assistant markdown as clean conversation text", () => {
+    const output = renderToString(
+      <MessageHistory
+        rows={[
+          {
+            kind: "assistant",
+            text: [
+              "## Fix",
+              "",
+              "One line - pass `onPreCompactionFlush` to `runCompaction()`.",
+              "- **Without** the fix: fails - `expected [] to have a length of 1`",
+              "- **With** the fix: passes",
+            ].join("\n"),
+          },
+        ]}
+      />,
+    );
+
+    expect(output).toContain("Fix");
+    expect(output).toContain("One line - pass onPreCompactionFlush to runCompaction().");
+    expect(output).toContain("- Without the fix: fails - expected [] to have a length of 1");
+    expect(output).toContain("- With the fix: passes");
+    expect(output).not.toContain("##");
+    expect(output).not.toContain("`");
+    expect(output).not.toContain("**");
+  });
+
   it("renders collapsed or expanded tool results", () => {
     const rows = [
       {

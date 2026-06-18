@@ -4,6 +4,7 @@ export const tuiTheme = {
     accent: "green",
     warning: "yellow",
     error: "red",
+    code: "blueBright",
     dim: "gray",
     border: "gray",
     text: "white",
