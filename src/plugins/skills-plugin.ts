@@ -106,6 +106,7 @@ function createSkillSlashCommands(skills: DiscoveredSkill[]): AgentSlashCommand[
   return skills.map((skill) => ({
     name: skill.name,
     description: skill.description,
+    kind: "skill" as const,
     toPrompt: ({ args }) =>
       [
         `Use the "${skill.name}" skill for this request.`,

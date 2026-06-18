@@ -64,6 +64,7 @@ describe("tui runtime helpers", () => {
 
   it("turns plugin commands into steering text while streaming", async () => {
     const calls: string[] = [];
+    const actions: TuiViewAction[] = [];
     const agent = createAgent({
       isStreaming: true,
       steer: (message) => {
@@ -82,10 +83,52 @@ describe("tui runtime helpers", () => {
             toPrompt: ({ args }) => `Use review skill: ${args}`,
           },
         ],
+        dispatch: (action) => actions.push(action),
       }),
     );
 
     expect(calls).toEqual(["steer:Use review skill: focus diff"]);
+    expect(actions).toContainEqual({ type: "steer_queued", text: "/review focus diff" });
+  });
+
+  it("uses raw plugin commands as the visible user message while sending expanded prompts to the model", async () => {
+    const actions: TuiViewAction[] = [];
+    const calls: string[] = [];
+    const agent = createAgent({
+      isStreaming: false,
+      prompt: async (input) => {
+        calls.push(`prompt:${input}`);
+      },
+    });
+
+    await handleTuiInput(
+      "/review focus diff",
+      createOptions(agent, {
+        commands: [
+          {
+            name: "review",
+            description: "Review changes.",
+            source: "plugin",
+            toPrompt: ({ args }) =>
+              [
+                'Use the "review" skill for this request.',
+                'First call skill_read with name "review" and follow the loaded SKILL.md instructions before answering.',
+                `User request: ${args}`,
+              ].join("\n"),
+          },
+        ],
+        dispatch: (action) => actions.push(action),
+      }),
+    );
+
+    expect(calls).toEqual([
+      [
+        'prompt:Use the "review" skill for this request.',
+        'First call skill_read with name "review" and follow the loaded SKILL.md instructions before answering.',
+        "User request: focus diff",
+      ].join("\n"),
+    ]);
+    expect(actions).toContainEqual({ type: "next_user_message_display", text: "/review focus diff" });
   });
 
   it("handles local help and session commands without model calls", async () => {

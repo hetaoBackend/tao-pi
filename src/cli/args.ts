@@ -1,4 +1,5 @@
 export interface ParsedCliArgs {
+  command?: "setup";
   resume: boolean;
   resumeTarget?: string;
   print: boolean;
@@ -21,10 +22,16 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
   let print = false;
   let debug = false;
   let help = false;
+  let command: ParsedCliArgs["command"];
   const overrides: CliOverrides = {};
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+    if (!command && promptParts.length === 0 && arg === "setup") {
+      command = "setup";
+      continue;
+    }
+
     if (arg === "-h" || arg === "--help") {
       help = true;
       continue;
@@ -81,10 +88,10 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
 
   const firstPrompt = promptParts.join(" ").trim();
   if (resume) {
-    return { resume: true, resumeTarget, print, debug, help, overrides, firstPrompt };
+    return withCommand(command, { resume: true, resumeTarget, print, debug, help, overrides, firstPrompt });
   }
 
-  return { resume: false, print, debug, help, overrides, firstPrompt };
+  return withCommand(command, { resume: false, print, debug, help, overrides, firstPrompt });
 }
 
 function readOptionValue(argv: string[], index: number, option: string): string {
@@ -98,4 +105,8 @@ function readOptionValue(argv: string[], index: number, option: string): string 
 
 function isOptionToken(value: string): boolean {
   return value.startsWith("-");
+}
+
+function withCommand(command: ParsedCliArgs["command"], args: ParsedCliArgs): ParsedCliArgs {
+  return command ? { command, ...args } : args;
 }

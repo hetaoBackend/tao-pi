@@ -94,6 +94,34 @@ describe("tui view state", () => {
     expect(state.rows).toEqual([{ kind: "steering", text: "focus on tests" }]);
   });
 
+  it("uses an explicit display value for the next user message", () => {
+    let state = createInitialTuiViewState();
+
+    state = reduceTuiViewState(state, {
+      type: "next_user_message_display",
+      text: "/review focus diff",
+    });
+    state = reduceTuiViewState(state, {
+      type: "message_start",
+      message: {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: [
+              'Use the "review" skill for this request.',
+              'First call skill_read with name "review" and follow the loaded SKILL.md instructions before answering.',
+              "User request: focus diff",
+            ].join("\n"),
+          },
+        ],
+      },
+    });
+
+    expect(state.rows).toEqual([{ kind: "user", text: "/review focus diff" }]);
+    expect(state.nextUserMessageDisplayText).toBeUndefined();
+  });
+
   it("surfaces assistant error endings as error rows", () => {
     const state = reduceTuiViewState(createInitialTuiViewState(), {
       type: "message_end",

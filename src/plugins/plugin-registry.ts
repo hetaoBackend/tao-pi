@@ -10,6 +10,7 @@ export interface AgentPlugin {
 export interface AgentSlashCommand {
   name: string;
   description: string;
+  kind?: "skill";
   toPrompt: (input: AgentSlashCommandInput) => string;
 }
 
