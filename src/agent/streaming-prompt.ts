@@ -27,6 +27,8 @@ export async function runStreamingPrompt(
   const maxToolDisplayChars = hooks.maxToolDisplayChars ?? DEFAULT_MAX_TOOL_DISPLAY_CHARS;
   let wroteOutput = false;
   let outputEndsWithNewline = true;
+  let subscriberError: unknown;
+  const pendingSubscribers = new Set<Promise<void>>();
 
   const writeText = (text: string) => {
     output.write(text);
@@ -44,7 +46,7 @@ export async function runStreamingPrompt(
     outputEndsWithNewline = true;
   };
 
-  const unsubscribe = agent.subscribe(async (event) => {
+  const handleEvent = async (event: unknown) => {
     if (isTurnStartEvent(event)) {
       await hooks.beforeTurnStart?.({ event });
       return;
@@ -74,10 +76,27 @@ export async function runStreamingPrompt(
     if (isAssistantErrorEndEvent(event)) {
       writeBlock([`[assistant error] ${event.message.errorMessage}`]);
     }
+  };
+
+  const unsubscribe = agent.subscribe((event) => {
+    const pending = Promise.resolve()
+      .then(() => handleEvent(event))
+      .catch((error: unknown) => {
+        subscriberError ??= error;
+      });
+    pendingSubscribers.add(pending);
+    pending.finally(() => {
+      pendingSubscribers.delete(pending);
+    });
+    return pending;
   });
 
   try {
     await agent.prompt(input);
+    await Promise.all(pendingSubscribers);
+    if (subscriberError) {
+      throw subscriberError;
+    }
   } finally {
     unsubscribe?.();
   }

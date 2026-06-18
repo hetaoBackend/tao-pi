@@ -23,9 +23,16 @@ export interface InputBoxProps {
   streaming: boolean;
   onSubmit: (text: string) => void;
   onAbort: () => void;
+  onToggleToolResults: () => void;
 }
 
-export function InputBox({ commands, streaming, onSubmit, onAbort }: InputBoxProps) {
+export interface InputCursorSegments {
+  before: string;
+  cursor: string;
+  after: string;
+}
+
+export function InputBox({ commands, streaming, onSubmit, onAbort, onToggleToolResults }: InputBoxProps) {
   const [editor, setEditor] = useState<InputEditorState>({ text: "", cursorOffset: 0 });
   const [dismissedQuery, setDismissedQuery] = useState<string | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -47,6 +54,11 @@ export function InputBox({ commands, streaming, onSubmit, onAbort }: InputBoxPro
   useInput((input, key) => {
     if (key.ctrl && input === "c") {
       onAbort();
+      return;
+    }
+
+    if (isToggleToolResultsInput(input, key)) {
+      onToggleToolResults();
       return;
     }
 
@@ -131,8 +143,43 @@ export function InputBox({ commands, streaming, onSubmit, onAbort }: InputBoxPro
       {pickerOpen ? <CommandList commands={filteredCommands} selectedIndex={selectedIndex} /> : null}
       <Box borderStyle="single" borderColor={tuiTheme.colors.border} paddingX={1} columnGap={1}>
         <Text color={streaming ? tuiTheme.colors.warning : tuiTheme.colors.primary}>{tuiTheme.symbols.prompt}</Text>
-        <Text>{editor.text || <Text color={tuiTheme.colors.dim}>{placeholder}</Text>}</Text>
+        <InputText editor={editor} placeholder={placeholder} />
       </Box>
     </Box>
   );
+}
+
+function InputText({ editor, placeholder }: { editor: InputEditorState; placeholder: string }) {
+  const segments = getInputCursorSegments(editor.text, editor.cursorOffset);
+
+  if (!editor.text) {
+    return (
+      <Box>
+        <Text inverse>{segments.cursor}</Text>
+        <Text color={tuiTheme.colors.dim}>{placeholder}</Text>
+      </Box>
+    );
+  }
+
+  return (
+    <Box>
+      <Text>{segments.before}</Text>
+      <Text inverse>{segments.cursor}</Text>
+      <Text>{segments.after}</Text>
+    </Box>
+  );
+}
+
+export function isToggleToolResultsInput(input: string, key: { ctrl?: boolean }): boolean {
+  return Boolean(key.ctrl && input === "o");
+}
+
+export function getInputCursorSegments(text: string, cursorOffset: number): InputCursorSegments {
+  const safeOffset = Math.max(0, Math.min(cursorOffset, text.length));
+
+  return {
+    before: text.slice(0, safeOffset),
+    cursor: text[safeOffset] ?? " ",
+    after: text.slice(safeOffset + 1),
+  };
 }

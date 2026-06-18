@@ -2,7 +2,9 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Type } from "@earendil-works/pi-ai";
 import { spawn } from "node:child_process";
 import { stat } from "node:fs/promises";
-import { relative, resolve, sep } from "node:path";
+import { resolve } from "node:path";
+import { isNodeError, throwIfAborted } from "../utils/errors.js";
+import { resolveExistingWorkspacePath, toDisplayPath } from "./workspace-path.js";
 
 const DEFAULT_TIMEOUT_MS = 30000;
 const DEFAULT_MAX_OUTPUT_CHARS = 20000;
@@ -150,6 +152,7 @@ function runBashCommand(params: {
     const child = spawn("bash", ["-lc", params.command], {
       cwd: params.cwd,
       env: params.gitOptionalLocksDisabled ? { ...process.env, GIT_OPTIONAL_LOCKS: "0" } : process.env,
+      detached: process.platform !== "win32",
     });
     let stdout = "";
     let stderr = "";
@@ -157,6 +160,7 @@ function runBashCommand(params: {
     let stderrChars = 0;
     let timedOut = false;
     let settled = false;
+    let forceKillTimeout: NodeJS.Timeout | undefined;
 
     const settle = (
       result: Pick<
@@ -177,6 +181,9 @@ function runBashCommand(params: {
 
       settled = true;
       clearTimeout(timeout);
+      if (forceKillTimeout) {
+        clearTimeout(forceKillTimeout);
+      }
       params.signal?.removeEventListener("abort", abort);
       resolvePromise(result);
     };
@@ -188,18 +195,25 @@ function runBashCommand(params: {
 
       settled = true;
       clearTimeout(timeout);
+      if (forceKillTimeout) {
+        clearTimeout(forceKillTimeout);
+      }
       params.signal?.removeEventListener("abort", abort);
       reject(error);
     };
 
     const abort = () => {
-      child.kill();
+      killChildProcessGroup(child.pid, "SIGTERM");
       fail(new Error("Tool execution aborted"));
     };
 
     const timeout = setTimeout(() => {
       timedOut = true;
-      child.kill();
+      killChildProcessGroup(child.pid, "SIGTERM");
+      forceKillTimeout = setTimeout(() => {
+        killChildProcessGroup(child.pid, "SIGKILL");
+      }, 100);
+      forceKillTimeout.unref?.();
     }, params.timeoutMs);
 
     params.signal?.addEventListener("abort", abort, { once: true });
@@ -231,6 +245,26 @@ function runBashCommand(params: {
       });
     });
   });
+}
+
+function killChildProcessGroup(pid: number | undefined, signal: NodeJS.Signals): void {
+  if (pid === undefined) {
+    return;
+  }
+
+  try {
+    process.kill(process.platform === "win32" ? pid : -pid, signal);
+  } catch (error) {
+    if (!isMissingProcessError(error)) {
+      try {
+        process.kill(pid, signal);
+      } catch (fallbackError) {
+        if (!isMissingProcessError(fallbackError)) {
+          throw fallbackError;
+        }
+      }
+    }
+  }
 }
 
 function formatCommandResult(
@@ -299,21 +333,16 @@ const READ_ONLY_GIT_SUBCOMMANDS = new Set([
   "status",
 ]);
 
-function resolveWorkspacePath(root: string, requestedPath: string): string {
-  if (!requestedPath.trim()) {
-    throw new Error("Path is required");
-  }
-
-  const target = resolve(root, requestedPath);
-  if (target !== root && !target.startsWith(`${root}${sep}`)) {
-    throw new Error("Path must stay inside the workspace");
-  }
-
-  return target;
-}
-
 async function resolveWorkspaceDirectory(root: string, requestedPath: string): Promise<string> {
-  const target = resolveWorkspacePath(root, requestedPath);
+  let target: string;
+  try {
+    target = await resolveExistingWorkspacePath(root, requestedPath);
+  } catch (error) {
+    if (error instanceof Error && error.message === "Path must stay inside the workspace") {
+      throw error;
+    }
+    throw new Error(`cwd must be an existing directory: ${requestedPath}`);
+  }
 
   try {
     const info = await stat(target);
@@ -330,12 +359,6 @@ async function resolveWorkspaceDirectory(root: string, requestedPath: string): P
   return target;
 }
 
-function toDisplayPath(root: string, target: string): string {
-  return relative(root, target) || ".";
-}
-
-function throwIfAborted(signal?: AbortSignal): void {
-  if (signal?.aborted) {
-    throw new Error("Tool execution aborted");
-  }
+function isMissingProcessError(error: unknown): boolean {
+  return isNodeError(error) && error.code === "ESRCH";
 }

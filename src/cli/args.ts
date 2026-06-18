@@ -1,21 +1,12 @@
-export type ParsedCliArgs =
-  | {
-      resume: false;
-      print: boolean;
-      debug: boolean;
-      help: boolean;
-      overrides: CliOverrides;
-      firstPrompt: string;
-    }
-  | {
-      resume: true;
-      resumeTarget: string;
-      print: boolean;
-      debug: boolean;
-      help: boolean;
-      overrides: CliOverrides;
-      firstPrompt: string;
-    };
+export interface ParsedCliArgs {
+  resume: boolean;
+  resumeTarget?: string;
+  print: boolean;
+  debug: boolean;
+  help: boolean;
+  overrides: CliOverrides;
+  firstPrompt: string;
+}
 
 export interface CliOverrides {
   provider?: string;

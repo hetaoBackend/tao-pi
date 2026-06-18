@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { isMissingFileError } from "../utils/errors.js";
 
 const DEFAULT_CONTEXT_FILES = ["AGENTS.md", "CLAUDE.md", "CONTEXT.md"];
 const DEFAULT_MAX_CHARS_PER_FILE = 12000;
@@ -58,14 +59,10 @@ async function readOptionalUtf8File(path: string): Promise<string | undefined> {
   try {
     return await readFile(path, "utf8");
   } catch (error) {
-    if (isNodeError(error) && error.code === "ENOENT") {
+    if (isMissingFileError(error)) {
       return undefined;
     }
 
     throw error;
   }
-}
-
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error;
 }

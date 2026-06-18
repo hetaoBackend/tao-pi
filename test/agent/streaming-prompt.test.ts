@@ -41,6 +41,33 @@ describe("runStreamingPrompt", () => {
     expect(output.chunks.join("")).toBe("hello world");
   });
 
+  it("rejects when subscriber output handling fails even if the agent does not await listeners", async () => {
+    let listener: ((event: unknown) => Promise<void> | void) | undefined;
+    let unsubscribed = false;
+    const output = {
+      write() {
+        throw new Error("output closed");
+      },
+    } as unknown as Writable;
+    const agent = {
+      subscribe(callback: (event: unknown) => Promise<void> | void) {
+        listener = callback;
+        return () => {
+          unsubscribed = true;
+        };
+      },
+      async prompt() {
+        void listener?.({
+          type: "message_update",
+          assistantMessageEvent: { type: "text_delta", delta: "hello" },
+        });
+      },
+    };
+
+    await expect(runStreamingPrompt(agent, "Say hi", output)).rejects.toThrow("output closed");
+    expect(unsubscribed).toBe(true);
+  });
+
   it("runs a beforeTurnStart hook when the pi turn_start event is emitted", async () => {
     const output = new MemoryWriter();
     const calls: string[] = [];

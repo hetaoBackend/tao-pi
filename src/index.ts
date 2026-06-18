@@ -2,25 +2,25 @@ import { Agent } from "@earendil-works/pi-agent-core";
 import { getEnvApiKey } from "@earendil-works/pi-ai";
 import { stderr, stdin, stdout } from "node:process";
 import { createInterface } from "node:readline/promises";
-import { join } from "node:path";
 import { createTransformContext, prefixLatestUserTextMessage } from "./agent/context-transform.js";
 import { resolveConfiguredModel } from "./agent/model-config.js";
 import { loadProjectContext } from "./agent/project-context.js";
 import { runStreamingPrompt } from "./agent/streaming-prompt.js";
 import { buildSystemPrompt } from "./agent/system-prompt.js";
 import { parseCliArgs } from "./cli/args.js";
+import { APP_VERSION } from "./cli/app-info.js";
 import { runMultiTurnConversation } from "./cli/conversation.js";
 import { shouldUseTui } from "./cli/runtime-mode.js";
+import { readPipedStdin } from "./cli/stdin.js";
 import { renderCliHelp, renderSessionSummary, renderWelcome } from "./cli/ui.js";
+import { loadAppConfig } from "./config.js";
 import { SqliteSessionStore } from "./persistence/session-store.js";
 import { createConfiguredPlugins } from "./plugins/default-plugins.js";
 import { createAgentPluginRuntime } from "./plugins/plugin-registry.js";
 import { createCommandTools } from "./tools/command-tools.js";
 import { createFileTools } from "./tools/file-tools.js";
 import { createFirecrawlTools } from "./tools/firecrawl-tools.js";
-
-const DEFAULT_PROVIDER = "openai";
-const DEFAULT_MODEL = "gpt-4.1-mini";
+import { formatError } from "./utils/errors.js";
 
 main().catch((error: unknown) => {
   stderr.write(`Error: ${formatError(error)}\n`);
@@ -36,65 +36,61 @@ async function main(): Promise<void> {
     return;
   }
 
-  const provider = cliArgs.overrides.provider ?? process.env.PI_PROVIDER ?? DEFAULT_PROVIDER;
-  const modelId = cliArgs.overrides.model ?? process.env.PI_MODEL ?? DEFAULT_MODEL;
-  const modelTemplateId = process.env.PI_MODEL_TEMPLATE;
-  const modelBaseUrl = cliArgs.overrides.baseUrl ?? process.env.PI_BASE_URL;
-  const workspaceRoot = process.env.PI_WORKSPACE_ROOT ?? process.cwd();
-  const sessionDbPath = process.env.PI_SESSION_DB ?? join(process.cwd(), ".pi-sessions.sqlite");
-  const contextPrefix = process.env.PI_CONTEXT_PREFIX;
-  const promptTimeZone = process.env.PI_TIMEZONE;
-  const debug = cliArgs.debug || process.env.PI_DEBUG?.toLowerCase() === "true";
-  const modelLabel = `${provider}/${modelId}`;
-  const projectContext = await loadProjectContext({ workspaceRoot });
+  const config = loadAppConfig({
+    cwd: process.cwd(),
+    env: process.env,
+    overrides: cliArgs.overrides,
+    debugFlag: cliArgs.debug,
+  });
+  const modelLabel = `${config.provider}/${config.modelId}`;
+  const projectContext = await loadProjectContext({ workspaceRoot: config.workspaceRoot });
   const projectContextFiles = projectContext.map((entry) => entry.path);
   const pluginRuntime = createAgentPluginRuntime(
     createConfiguredPlugins({
-      workspaceRoot,
-      configuredPluginIds: process.env.PI_PLUGINS,
-      memoryDir: process.env.PI_MEMORY_DIR,
-      skillDirs: parsePathList(process.env.PI_SKILLS_DIRS),
+      workspaceRoot: config.workspaceRoot,
+      configuredPluginIds: config.configuredPluginIds,
+      memoryDir: config.memoryDir,
+      skillDirs: config.skillDirs,
     }),
   );
   const tools = [
     ...pluginRuntime.tools,
-    ...createFileTools(workspaceRoot),
-    ...createCommandTools(workspaceRoot),
+    ...createFileTools(config.workspaceRoot),
+    ...createCommandTools(config.workspaceRoot),
     ...createFirecrawlTools({
-      apiKey: process.env.FIRECRAWL_API_KEY,
-      baseUrl: process.env.FIRECRAWL_BASE_URL,
+      apiKey: config.firecrawlApiKey,
+      baseUrl: config.firecrawlBaseUrl,
     }),
   ];
   const toolNames = tools.map((tool) => tool.name);
 
   const model = resolveConfiguredModel({
-    provider,
-    modelId,
-    modelTemplateId,
-    baseUrl: modelBaseUrl,
-    compat: {
-      ...parseOptionalBooleanCompat("supportsDeveloperRole", process.env.PI_SUPPORTS_DEVELOPER_ROLE),
-    },
+    provider: config.provider,
+    modelId: config.modelId,
+    modelTemplateId: config.modelTemplateId,
+    baseUrl: config.modelBaseUrl,
+    compat: config.modelCompat,
   });
-  const apiKey = process.env.PI_API_KEY ?? getEnvApiKey(provider);
-  const sessionStore = await SqliteSessionStore.open(sessionDbPath);
+  const apiKey = process.env.PI_API_KEY ?? getEnvApiKey(config.provider);
+  const sessionStore = await SqliteSessionStore.open(config.sessionDbPath);
+  const resumeTarget = cliArgs.resumeTarget ?? "latest";
   const session = cliArgs.resume
-    ? cliArgs.resumeTarget === "latest"
+    ? resumeTarget === "latest"
       ? await sessionStore.loadLatest()
-      : await sessionStore.load(cliArgs.resumeTarget)
+      : await sessionStore.load(resumeTarget)
     : await sessionStore.create();
   const sessionMode = cliArgs.resume ? "resumed" : "new";
 
   if (!apiKey) {
     throw new Error(
-      `No API key found for provider "${provider}". Set PI_API_KEY or the provider-specific API key env var.`,
+      `No API key found for provider "${config.provider}". Set PI_API_KEY or the provider-specific API key env var.`,
     );
   }
 
   const agent = new Agent({
     initialState: {
       systemPrompt: buildSystemPrompt({
-        timeZone: promptTimeZone,
+        timeZone: config.promptTimeZone,
         projectContext,
         pluginPromptSections: pluginRuntime.systemPromptSections,
       }),
@@ -106,13 +102,13 @@ async function main(): Promise<void> {
     transformContext: createTransformContext({
       sessionId: session.id,
       transform: ({ messages, sessionId }) => {
-        if (!contextPrefix) {
+        if (!config.contextPrefix) {
           return messages;
         }
 
         return prefixLatestUserTextMessage(
           messages,
-          `[transformContext session=${sessionId}]\n${contextPrefix}\n`,
+          `[transformContext session=${sessionId}]\n${config.contextPrefix}\n`,
         );
       },
     }),
@@ -125,7 +121,7 @@ async function main(): Promise<void> {
     });
 
   const beforeTurnStart = ({ event }: { event: { type: "turn_start" } }) => {
-    if (!debug) {
+    if (!config.debug) {
       return;
     }
 
@@ -134,7 +130,7 @@ async function main(): Promise<void> {
     );
   };
 
-  const prompt = cliArgs.firstPrompt || (cliArgs.print ? await readPipedStdin() : "");
+  const prompt = cliArgs.firstPrompt || (cliArgs.print ? await readPipedStdin(stdin) : "");
   if (cliArgs.print && !prompt) {
     throw new Error("--print requires a prompt or piped stdin");
   }
@@ -158,10 +154,11 @@ async function main(): Promise<void> {
       await runTuiConversation({
         agent,
         output: stdout,
+        appVersion: APP_VERSION,
         modelLabel,
         sessionId: session.id,
         sessionMode,
-        workspaceRoot,
+        workspaceRoot: config.workspaceRoot,
         toolNames,
         pluginIds: pluginRuntime.pluginIds,
         projectContextFiles,
@@ -173,8 +170,8 @@ async function main(): Promise<void> {
             sessionId: session.id,
             sessionMode,
             historyMessages: agent.state.messages.length,
-            dbPath: sessionDbPath,
-            workspaceRoot,
+            dbPath: config.sessionDbPath,
+            workspaceRoot: config.workspaceRoot,
             modelLabel,
             toolNames,
             pluginIds: pluginRuntime.pluginIds,
@@ -195,12 +192,12 @@ async function main(): Promise<void> {
       sessionId: session.id,
       sessionMode,
       historyMessages: session.messages.length,
-      dbPath: sessionDbPath,
-      workspaceRoot,
+      dbPath: config.sessionDbPath,
+      workspaceRoot: config.workspaceRoot,
       toolNames,
       pluginIds: pluginRuntime.pluginIds,
       projectContextFiles,
-      debug,
+      debug: config.debug,
     }),
   );
 
@@ -227,8 +224,8 @@ async function main(): Promise<void> {
           sessionId: session.id,
           sessionMode,
           historyMessages: agent.state.messages.length,
-          dbPath: sessionDbPath,
-          workspaceRoot,
+          dbPath: config.sessionDbPath,
+          workspaceRoot: config.workspaceRoot,
           modelLabel,
           toolNames,
           pluginIds: pluginRuntime.pluginIds,
@@ -239,42 +236,4 @@ async function main(): Promise<void> {
   } finally {
     readline.close();
   }
-}
-
-function parseOptionalBooleanCompat(key: string, value: string | undefined): Record<string, boolean> {
-  if (value === undefined) {
-    return {};
-  }
-
-  return {
-    [key]: value.toLowerCase() === "true",
-  };
-}
-
-function parsePathList(value: string | undefined): string[] {
-  if (!value) {
-    return [];
-  }
-
-  return value
-    .split(":")
-    .map((path) => path.trim())
-    .filter(Boolean);
-}
-
-async function readPipedStdin(): Promise<string> {
-  if (stdin.isTTY) {
-    return "";
-  }
-
-  const chunks: Buffer[] = [];
-  for await (const chunk of stdin) {
-    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
-  }
-
-  return Buffer.concat(chunks).toString("utf8").trim();
-}
-
-function formatError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

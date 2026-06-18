@@ -10,6 +10,7 @@ import { TodoPanel } from "./components/todo-panel.js";
 import type { TuiRow } from "./view-state.js";
 
 export interface TuiAppProps {
+  appVersion: string;
   modelLabel: string;
   sessionId: string;
   sessionMode: "new" | "resumed";
@@ -24,9 +25,12 @@ export interface TuiAppProps {
   streaming: boolean;
   onSubmit: (text: string) => void;
   onAbort: () => void;
+  toolResultsExpanded: boolean;
+  onToggleToolResults: () => void;
 }
 
 export function TuiApp({
+  appVersion,
   modelLabel,
   sessionId,
   sessionMode,
@@ -41,12 +45,15 @@ export function TuiApp({
   streaming,
   onSubmit,
   onAbort,
+  toolResultsExpanded,
+  onToggleToolResults,
 }: TuiAppProps) {
   const nextTodo = todos.find((todo) => todo.status === "in_progress") ?? todos.find((todo) => todo.status === "pending");
 
   return (
     <Box flexDirection="column" width="100%" rowGap={1}>
       <Header
+        appVersion={appVersion}
         modelLabel={modelLabel}
         sessionId={sessionId}
         sessionMode={sessionMode}
@@ -55,10 +62,16 @@ export function TuiApp({
         pluginCount={pluginCount}
         projectContextCount={projectContextCount}
       />
-      <MessageHistory rows={rows} />
+      <MessageHistory rows={rows} toolResultsExpanded={toolResultsExpanded} />
       <StreamingIndicator streaming={streaming} nextTodo={nextTodo?.content} />
       <TodoPanel todos={todos} streaming={streaming} />
-      <InputBox commands={commands} streaming={streaming} onSubmit={onSubmit} onAbort={onAbort} />
+      <InputBox
+        commands={commands}
+        streaming={streaming}
+        onSubmit={onSubmit}
+        onAbort={onAbort}
+        onToggleToolResults={onToggleToolResults}
+      />
       <Footer
         modelLabel={modelLabel}
         sessionMode={sessionMode}

@@ -4,9 +4,10 @@ import { tuiTheme } from "../theme.js";
 
 export interface MessageHistoryProps {
   rows: readonly TuiRow[];
+  toolResultsExpanded?: boolean;
 }
 
-export function MessageHistory({ rows }: MessageHistoryProps) {
+export function MessageHistory({ rows, toolResultsExpanded = false }: MessageHistoryProps) {
   if (rows.length === 0) {
     return null;
   }
@@ -14,13 +15,13 @@ export function MessageHistory({ rows }: MessageHistoryProps) {
   return (
     <Box flexDirection="column" rowGap={1}>
       {rows.map((row, index) => (
-        <MessageRow key={`${row.kind}:${index}`} row={row} />
+        <MessageRow key={`${row.kind}:${index}`} row={row} toolResultsExpanded={toolResultsExpanded} />
       ))}
     </Box>
   );
 }
 
-function MessageRow({ row }: { row: TuiRow }) {
+function MessageRow({ row, toolResultsExpanded }: { row: TuiRow; toolResultsExpanded: boolean }) {
   switch (row.kind) {
     case "user":
       return (
@@ -39,6 +40,7 @@ function MessageRow({ row }: { row: TuiRow }) {
         </Box>
       );
     case "tool":
+      const result = toolResultsExpanded && row.resultTruncated ? row.fullResult : row.result;
       return (
         <Box flexDirection="column">
           <Box columnGap={1}>
@@ -49,7 +51,7 @@ function MessageRow({ row }: { row: TuiRow }) {
             <Text color={statusColor(row.status)}>{row.status}</Text>
           </Box>
           {row.detail ? <Text color={tuiTheme.colors.dim}>  {row.detail}</Text> : null}
-          {row.result ? <Text color={tuiTheme.colors.dim}>  {row.result}</Text> : null}
+          {result ? <Text color={tuiTheme.colors.dim}>  {result}</Text> : null}
         </Box>
       );
     case "steering":

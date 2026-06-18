@@ -44,6 +44,24 @@ describe("SqliteSessionStore", () => {
     expect(dbBytes.subarray(0, 16).toString("utf8")).toBe("SQLite format 3\0");
   });
 
+  it("preserves sessions written by another open store for the same database path", async () => {
+    const firstStore = await SqliteSessionStore.open(dbPath);
+    const secondStore = await SqliteSessionStore.open(dbPath);
+
+    await firstStore.save({
+      id: "first",
+      messages: [{ role: "user", content: "from first", timestamp: 1 }],
+    });
+    await secondStore.save({
+      id: "second",
+      messages: [{ role: "user", content: "from second", timestamp: 2 }],
+    });
+
+    const reopened = await SqliteSessionStore.open(dbPath);
+    await expect(reopened.load("first")).resolves.toMatchObject({ id: "first" });
+    await expect(reopened.load("second")).resolves.toMatchObject({ id: "second" });
+  });
+
   it("returns the most recently created session for resume latest", async () => {
     const store = await SqliteSessionStore.open(dbPath);
 

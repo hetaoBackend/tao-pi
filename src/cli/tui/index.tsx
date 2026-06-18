@@ -1,3 +1,4 @@
+import type { AgentEvent } from "@earendil-works/pi-agent-core";
 import { render, useApp } from "ink";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Writable } from "node:stream";
@@ -27,12 +28,13 @@ export interface TuiControllerAgent {
   prompt(input: string): Promise<unknown>;
   steer(message: UserTextMessage): void;
   abort(): void;
-  subscribe(listener: (event: unknown, signal?: AbortSignal) => Promise<void> | void): (() => void) | void;
+  subscribe(listener: (event: AgentEvent, signal?: AbortSignal) => Promise<void> | void): (() => void) | void;
 }
 
 export interface RunTuiConversationOptions {
   agent: TuiControllerAgent;
   output: Writable;
+  appVersion: string;
   modelLabel: string;
   sessionId: string;
   sessionMode: "new" | "resumed";
@@ -136,7 +138,7 @@ function RuntimeApp(options: RunTuiConversationOptions) {
 
   useEffect(() => {
     return options.agent.subscribe((event) => {
-      dispatch(event as TuiViewAction);
+      dispatch(event);
     });
   }, [dispatch, options.agent]);
 
@@ -159,8 +161,13 @@ function RuntimeApp(options: RunTuiConversationOptions) {
     options.agent.abort();
   }, [options.agent]);
 
+  const onToggleToolResults = useCallback(() => {
+    dispatch({ type: "toggle_tool_results" });
+  }, [dispatch]);
+
   return (
     <TuiApp
+      appVersion={options.appVersion}
       modelLabel={options.modelLabel}
       sessionId={options.sessionId}
       sessionMode={options.sessionMode}
@@ -173,8 +180,10 @@ function RuntimeApp(options: RunTuiConversationOptions) {
       rows={viewState.rows}
       todos={viewState.latestTodos}
       streaming={viewState.streaming}
+      toolResultsExpanded={viewState.toolResultsExpanded}
       onSubmit={onSubmit}
       onAbort={onAbort}
+      onToggleToolResults={onToggleToolResults}
     />
   );
 }

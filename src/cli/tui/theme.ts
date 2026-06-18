@@ -15,6 +15,6 @@ export const tuiTheme = {
     steering: "->",
     pending: "o",
     active: "~",
-    done: "x",
+    done: "✅",
   },
 } as const;

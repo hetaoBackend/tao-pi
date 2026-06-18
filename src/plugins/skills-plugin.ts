@@ -2,6 +2,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Type } from "@earendil-works/pi-ai";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { throwIfAborted } from "../utils/errors.js";
 import type { AgentPlugin, AgentSlashCommand } from "./plugin-registry.js";
 
 const DEFAULT_SKILL_DESCRIPTION = "No description provided.";
@@ -140,10 +141,4 @@ function parseFrontmatter(content: string): Partial<Pick<DiscoveredSkill, "name"
   }
 
   return result;
-}
-
-function throwIfAborted(signal?: AbortSignal): void {
-  if (signal?.aborted) {
-    throw new Error("Tool execution aborted");
-  }
 }

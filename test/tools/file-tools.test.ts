@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -415,6 +415,27 @@ describe("createFileTools", () => {
     await expect(readFile(join(workspaceRoot, "large.txt"), "utf8")).resolves.toContain("line 205 updated");
   });
 
+  it("expires old read_file records instead of retaining them forever", async () => {
+    const tools = createFileTools(workspaceRoot);
+    const readTool = tools.find((tool) => tool.name === "read_file");
+    const editTool = tools.find((tool) => tool.name === "edit_file");
+
+    for (let index = 0; index < 129; index += 1) {
+      const fileName = `file-${index}.txt`;
+      await writeFile(join(workspaceRoot, fileName), `content ${index}\n`, "utf8");
+      await readTool?.execute(`read-${index}`, { path: fileName });
+    }
+
+    await expect(
+      editTool?.execute("edit-1", {
+        path: "file-0.txt",
+        old_text: "content 0",
+        new_text: "updated 0",
+      }),
+    ).rejects.toThrow("Read the file with read_file before editing it");
+    await expect(readFile(join(workspaceRoot, "file-0.txt"), "utf8")).resolves.toBe("content 0\n");
+  });
+
   it("rejects ambiguous edit_file replacements", async () => {
     await writeFile(join(workspaceRoot, "notes.txt"), "repeat\nrepeat\n", "utf8");
 
@@ -632,5 +653,26 @@ describe("createFileTools", () => {
     await expect(infoTool?.execute("call-2", { path: "../outside.txt" })).rejects.toThrow(
       "Path must stay inside the workspace",
     );
+  });
+
+  it("rejects symlink paths that resolve outside the workspace root", async () => {
+    const outsideRoot = await mkdtemp(join(tmpdir(), "tao-pi-tools-outside-"));
+    try {
+      await writeFile(join(outsideRoot, "secret.txt"), "secret", "utf8");
+      await symlink(join(outsideRoot, "secret.txt"), join(workspaceRoot, "link.txt"));
+
+      const tools = createFileTools(workspaceRoot);
+      const readTool = tools.find((tool) => tool.name === "read_file");
+      const infoTool = tools.find((tool) => tool.name === "file_info");
+
+      await expect(readTool?.execute("call-1", { path: "link.txt" })).rejects.toThrow(
+        "Path must stay inside the workspace",
+      );
+      await expect(infoTool?.execute("call-2", { path: "link.txt" })).rejects.toThrow(
+        "Path must stay inside the workspace",
+      );
+    } finally {
+      await rm(outsideRoot, { recursive: true, force: true });
+    }
   });
 });

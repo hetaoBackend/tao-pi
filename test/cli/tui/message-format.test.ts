@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatToolArgs, formatToolResult, summarizeToolTitle } from "../../../src/cli/tui/message-format.js";
+import {
+  formatToolArgs,
+  formatToolResult,
+  summarizeToolTitle,
+  TOOL_RESULT_EXPANDED_CHARS,
+} from "../../../src/cli/tui/message-format.js";
 
 describe("tui message format", () => {
   it("summarizes known tool arguments", () => {
@@ -16,6 +21,10 @@ describe("tui message format", () => {
     };
 
     expect(formatToolResult(result, 10)).toBe("abcdefghij...");
+  });
+
+  it("uses Infinity to make expanded tool results explicitly unbounded", () => {
+    expect(TOOL_RESULT_EXPANDED_CHARS).toBe(Infinity);
   });
 
   it("formats todo_write result as progress summary", () => {

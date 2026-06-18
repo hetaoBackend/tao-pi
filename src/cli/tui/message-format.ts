@@ -3,6 +3,9 @@ export interface TodoViewItem {
   status: "pending" | "in_progress" | "completed" | string;
 }
 
+export const TOOL_RESULT_PREVIEW_CHARS = 600;
+export const TOOL_RESULT_EXPANDED_CHARS = Infinity;
+
 export function summarizeToolTitle(toolName: string): string {
   switch (toolName) {
     case "bash":
@@ -64,7 +67,7 @@ export function formatToolArgs(toolName: string, args: unknown, maxChars = 240):
   return truncate(text || safeJson(args), maxChars);
 }
 
-export function formatToolResult(result: unknown, maxChars = 600): string {
+export function formatToolResult(result: unknown, maxChars = TOOL_RESULT_PREVIEW_CHARS): string {
   const todos = extractTodos(result);
   if (todos.length > 0) {
     const completed = todos.filter((todo) => todo.status === "completed").length;

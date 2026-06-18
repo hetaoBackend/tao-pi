@@ -1,5 +1,6 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Type } from "@earendil-works/pi-ai";
+import { throwIfAborted } from "../utils/errors.js";
 
 const TODO_STATUSES = new Set(["pending", "in_progress", "completed"]);
 
@@ -92,10 +93,4 @@ function formatTodos(todos: TodoItem[]): string {
   }
 
   return ["Todo list:", ...todos.map((todo, index) => `${index + 1}. [${todo.status}] ${todo.content}`)].join("\n");
-}
-
-function throwIfAborted(signal?: AbortSignal): void {
-  if (signal?.aborted) {
-    throw new Error("Tool execution aborted");
-  }
 }

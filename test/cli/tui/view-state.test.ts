@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { TOOL_RESULT_PREVIEW_CHARS } from "../../../src/cli/tui/message-format.js";
 import { createInitialTuiViewState, reduceTuiViewState, selectLatestTodos } from "../../../src/cli/tui/view-state.js";
 
 describe("tui view state", () => {
@@ -50,6 +51,40 @@ describe("tui view state", () => {
     expect(selectLatestTodos(state)).toEqual([{ content: "ship tui", status: "in_progress" }]);
   });
 
+  it("keeps collapsed and expanded tool result text", () => {
+    let state = createInitialTuiViewState();
+    const previewText = "a".repeat(TOOL_RESULT_PREVIEW_CHARS);
+    const fullText = `${previewText}tail`;
+
+    state = reduceTuiViewState(state, {
+      type: "tool_execution_start",
+      toolCallId: "call-1",
+      toolName: "bash",
+      args: { command: "printf" },
+    });
+    state = reduceTuiViewState(state, {
+      type: "tool_execution_end",
+      toolCallId: "call-1",
+      toolName: "bash",
+      isError: false,
+      result: {
+        content: [{ type: "text", text: fullText }],
+      },
+    });
+
+    expect(state.toolResultsExpanded).toBe(false);
+    expect(state.rows).toMatchObject([
+      {
+        kind: "tool",
+        result: `${previewText}...`,
+        fullResult: fullText,
+        resultTruncated: true,
+      },
+    ]);
+
+    expect(reduceTuiViewState(state, { type: "toggle_tool_results" }).toolResultsExpanded).toBe(true);
+  });
+
   it("records steering rows separately from prompt rows", () => {
     const state = reduceTuiViewState(createInitialTuiViewState(), {
       type: "steer_queued",
@@ -81,6 +116,7 @@ describe("tui view state", () => {
 
     expect(reduceTuiViewState(withRow, { type: "clear_rows" })).toEqual({
       streaming: true,
+      toolResultsExpanded: false,
       rows: [],
       latestTodos: [],
     });

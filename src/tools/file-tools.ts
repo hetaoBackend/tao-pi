@@ -2,11 +2,20 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Type } from "@earendil-works/pi-ai";
 import type { Stats } from "node:fs";
 import { access, mkdir, open, readFile, readdir, stat, writeFile } from "node:fs/promises";
-import { dirname, relative, resolve, sep } from "node:path";
+import { dirname, resolve } from "node:path";
+import { isMissingFileError, throwIfAborted } from "../utils/errors.js";
+import {
+  resolveExistingWorkspacePath,
+  resolveWritableWorkspacePath,
+  splitDisplayPath,
+  toDisplayPath,
+} from "./workspace-path.js";
 
 const DEFAULT_MAX_FILES = 200;
 const DEFAULT_MAX_MATCHES = 100;
 const DEFAULT_MAX_READ_LINES = 200;
+const MAX_READ_RECORDS = 128;
+const MAX_READ_TEXTS_PER_PATH = 16;
 const BINARY_SAMPLE_BYTES = 8192;
 const SKIPPED_NAMES = new Set([
   ".git",
@@ -183,6 +192,7 @@ interface EditFileDetails {
 export function createFileTools(workspaceRoot: string): AgentTool[] {
   const root = resolve(workspaceRoot);
   const readTextByPath = new Map<string, string[]>();
+  const readPathOrder: string[] = [];
 
   const listTool: AgentTool<typeof listFilesParameters, ListFilesDetails> = {
     name: "list_files",
@@ -194,7 +204,7 @@ export function createFileTools(workspaceRoot: string): AgentTool[] {
       throwIfAborted(signal);
 
       const requestedPath = params.path ?? ".";
-      const target = resolveWorkspacePath(root, requestedPath);
+      const target = await resolveExistingWorkspacePath(root, requestedPath);
       const maxResults = params.max_results ?? DEFAULT_MAX_FILES;
       const pattern = params.pattern?.trim();
       const allFiles = await collectWorkspaceFiles(root, target, pattern ? Number.MAX_SAFE_INTEGER : maxResults, signal);
@@ -230,7 +240,7 @@ export function createFileTools(workspaceRoot: string): AgentTool[] {
       }
 
       const requestedPath = params.path ?? ".";
-      const target = resolveWorkspacePath(root, requestedPath);
+      const target = await resolveExistingWorkspacePath(root, requestedPath);
       const maxResults = params.max_results ?? DEFAULT_MAX_MATCHES;
       const contextLines = params.context_lines ?? 0;
       const regex = params.regex ?? false;
@@ -241,7 +251,7 @@ export function createFileTools(workspaceRoot: string): AgentTool[] {
 
       for (const file of files) {
         throwIfAborted(signal);
-        const absolutePath = resolveWorkspacePath(root, file);
+        const absolutePath = await resolveExistingWorkspacePath(root, file);
         const text = await readTextFileIfSafe(absolutePath);
         if (text === undefined) {
           continue;
@@ -296,7 +306,7 @@ export function createFileTools(workspaceRoot: string): AgentTool[] {
     async execute(_toolCallId, params, signal) {
       throwIfAborted(signal);
 
-      const target = resolveWorkspacePath(root, params.path);
+      const target = await resolveExistingWorkspacePath(root, params.path);
       const info = await statWorkspacePath(root, target);
       const displayPath = toDisplayPath(root, target);
       const baseDetails = {
@@ -346,7 +356,7 @@ export function createFileTools(workspaceRoot: string): AgentTool[] {
     async execute(_toolCallId, params, signal) {
       throwIfAborted(signal);
 
-      const target = resolveWorkspacePath(root, params.path);
+      const target = await resolveExistingWorkspacePath(root, params.path);
       const targetInfo = await statWorkspacePath(root, target);
       if (targetInfo.isDirectory()) {
         throw new Error("Cannot read directory with read_file; use list_files or file_info instead");
@@ -362,9 +372,7 @@ export function createFileTools(workspaceRoot: string): AgentTool[] {
         maxLines: params.max_lines ?? DEFAULT_MAX_READ_LINES,
         showLineNumbers: params.show_line_numbers ?? false,
       });
-      const readTexts = readTextByPath.get(target) ?? [];
-      readTexts.push(readResult.visibleText);
-      readTextByPath.set(target, readTexts);
+      rememberReadText(readTextByPath, readPathOrder, target, readResult.text);
 
       return {
         content: [{ type: "text", text: readResult.text }],
@@ -394,7 +402,7 @@ export function createFileTools(workspaceRoot: string): AgentTool[] {
         throw new Error("old_text is required");
       }
 
-      const target = resolveWorkspacePath(root, params.path);
+      const target = await resolveExistingWorkspacePath(root, params.path);
       const readTexts = readTextByPath.get(target);
       if (!readTexts) {
         throw new Error("Read the file with read_file before editing it");
@@ -437,7 +445,7 @@ export function createFileTools(workspaceRoot: string): AgentTool[] {
         throw new Error("At least one edit is required");
       }
 
-      const target = resolveWorkspacePath(root, params.path);
+      const target = await resolveExistingWorkspacePath(root, params.path);
       const readTexts = readTextByPath.get(target);
       if (!readTexts) {
         throw new Error("Read the file with read_file before editing it");
@@ -492,7 +500,7 @@ export function createFileTools(workspaceRoot: string): AgentTool[] {
     async execute(_toolCallId, params, signal) {
       throwIfAborted(signal);
 
-      const target = resolveWorkspacePath(root, params.path);
+      const target = await resolveWritableWorkspacePath(root, params.path);
       const fileExists = await pathExists(target);
       if (fileExists && params.overwrite !== true) {
         throw new Error("File already exists; pass overwrite: true after confirming replacement is intended");
@@ -518,6 +526,24 @@ export function createFileTools(workspaceRoot: string): AgentTool[] {
   };
 
   return [infoTool, listTool, searchTool, readTool, editTool, multiEditTool, writeTool];
+}
+
+function rememberReadText(readTextByPath: Map<string, string[]>, readPathOrder: string[], target: string, text: string) {
+  const existingTexts = readTextByPath.get(target) ?? [];
+  const existingIndex = readPathOrder.indexOf(target);
+  if (existingIndex !== -1) {
+    readPathOrder.splice(existingIndex, 1);
+  }
+
+  readTextByPath.set(target, [...existingTexts, text].slice(-MAX_READ_TEXTS_PER_PATH));
+  readPathOrder.push(target);
+
+  while (readPathOrder.length > MAX_READ_RECORDS) {
+    const expiredPath = readPathOrder.shift();
+    if (expiredPath) {
+      readTextByPath.delete(expiredPath);
+    }
+  }
 }
 
 async function collectWorkspaceFiles(
@@ -595,7 +621,7 @@ async function pathExists(path: string): Promise<boolean> {
     await access(path);
     return true;
   } catch (error) {
-    if (isNodeError(error) && error.code === "ENOENT") {
+    if (isMissingFileError(error)) {
       return false;
     }
 
@@ -607,7 +633,7 @@ async function statWorkspacePath(root: string, target: string): Promise<Stats> {
   try {
     return await stat(target);
   } catch (error) {
-    if (isNodeError(error) && error.code === "ENOENT") {
+    if (isMissingFileError(error)) {
       throw new Error(`Path not found: ${toDisplayPath(root, target)}`);
     }
 
@@ -866,39 +892,10 @@ function countOccurrences(text: string, searchText: string): number {
   return count;
 }
 
-function resolveWorkspacePath(root: string, requestedPath: string): string {
-  if (!requestedPath.trim()) {
-    throw new Error("Path is required");
-  }
-
-  const target = resolve(root, requestedPath);
-  if (target !== root && !target.startsWith(`${root}${sep}`)) {
-    throw new Error("Path must stay inside the workspace");
-  }
-
-  return target;
-}
-
 function shouldSkipPath(root: string, target: string): boolean {
-  return toDisplayPath(root, target)
-    .split(sep)
-    .some((part) => shouldSkipName(part));
+  return splitDisplayPath(toDisplayPath(root, target)).some((part) => shouldSkipName(part));
 }
 
 function shouldSkipName(name: string): boolean {
   return SKIPPED_NAMES.has(name);
-}
-
-function toDisplayPath(root: string, target: string): string {
-  return relative(root, target) || ".";
-}
-
-function throwIfAborted(signal?: AbortSignal): void {
-  if (signal?.aborted) {
-    throw new Error("Tool execution aborted");
-  }
-}
-
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error;
 }

@@ -3,8 +3,28 @@ import {
   formatToolArgs,
   formatToolResult,
   summarizeToolTitle,
+  TOOL_RESULT_EXPANDED_CHARS,
+  TOOL_RESULT_PREVIEW_CHARS,
   type TodoViewItem,
 } from "./message-format.js";
+
+interface TuiMessageLike {
+  role?: unknown;
+  content?: unknown;
+  stopReason?: unknown;
+  errorMessage?: unknown;
+}
+
+interface TuiAssistantMessageEventLike {
+  type?: unknown;
+  delta?: unknown;
+}
+
+interface TuiToolResultLike {
+  content?: unknown;
+  details?: unknown;
+  terminate?: boolean;
+}
 
 export type TuiRow =
   | { kind: "user"; text: string }
@@ -16,6 +36,8 @@ export type TuiRow =
       title: string;
       detail: string;
       result?: string;
+      fullResult?: string;
+      resultTruncated?: boolean;
       status: "running" | "ok" | "error";
     }
   | { kind: "steering"; text: string }
@@ -23,21 +45,23 @@ export type TuiRow =
 
 export interface TuiViewState {
   streaming: boolean;
+  toolResultsExpanded: boolean;
   rows: TuiRow[];
   latestTodos: TodoViewItem[];
 }
 
 export type TuiViewAction =
   | { type: "agent_start" }
-  | { type: "agent_end"; messages?: unknown[] }
+  | { type: "agent_end"; messages?: TuiMessageLike[] }
   | { type: "turn_start" }
-  | { type: "turn_end"; message?: unknown; toolResults?: unknown[] }
-  | { type: "message_start"; message: unknown }
-  | { type: "message_update"; message?: unknown; assistantMessageEvent: unknown }
-  | { type: "message_end"; message: unknown }
+  | { type: "turn_end"; message?: TuiMessageLike; toolResults?: TuiMessageLike[] }
+  | { type: "message_start"; message: TuiMessageLike }
+  | { type: "message_update"; message?: TuiMessageLike; assistantMessageEvent: TuiAssistantMessageEventLike }
+  | { type: "message_end"; message: TuiMessageLike }
   | { type: "tool_execution_start"; toolCallId: string; toolName: string; args: unknown }
-  | { type: "tool_execution_update"; toolCallId: string; toolName: string; args?: unknown; partialResult: unknown }
-  | { type: "tool_execution_end"; toolCallId: string; toolName: string; result: unknown; isError: boolean }
+  | { type: "tool_execution_update"; toolCallId: string; toolName: string; args?: unknown; partialResult: TuiToolResultLike }
+  | { type: "tool_execution_end"; toolCallId: string; toolName: string; result: TuiToolResultLike; isError: boolean }
+  | { type: "toggle_tool_results" }
   | { type: "steer_queued"; text: string }
   | { type: "clear_rows" }
   | { type: "system_message"; text: string; tone?: "info" | "error" };
@@ -45,6 +69,7 @@ export type TuiViewAction =
 export function createInitialTuiViewState(): TuiViewState {
   return {
     streaming: false,
+    toolResultsExpanded: false,
     rows: [],
     latestTodos: [],
   };
@@ -72,15 +97,17 @@ export function reduceTuiViewState(state: TuiViewState, action: TuiViewAction): 
         status: "running",
       });
     case "tool_execution_update":
-      return updateToolRow(state, action.toolCallId, { result: formatToolResult(action.partialResult) });
+      return updateToolRow(state, action.toolCallId, formatToolResultView(action.partialResult));
     case "tool_execution_end": {
       const todos = extractTodos(action.result);
       const nextState = updateToolRow(state, action.toolCallId, {
         status: action.isError ? "error" : "ok",
-        result: formatToolResult(action.result),
+        ...formatToolResultView(action.result),
       });
       return todos.length ? { ...nextState, latestTodos: todos } : nextState;
     }
+    case "toggle_tool_results":
+      return { ...state, toolResultsExpanded: !state.toolResultsExpanded };
     case "steer_queued":
       return appendRow(state, { kind: "steering", text: action.text });
     case "clear_rows":
@@ -96,7 +123,7 @@ export function selectLatestTodos(state: TuiViewState): TodoViewItem[] {
   return state.latestTodos;
 }
 
-function handleMessageStart(state: TuiViewState, message: unknown): TuiViewState {
+function handleMessageStart(state: TuiViewState, message: TuiMessageLike): TuiViewState {
   if (!isObject(message)) {
     return state;
   }
@@ -112,7 +139,7 @@ function handleMessageStart(state: TuiViewState, message: unknown): TuiViewState
   return state;
 }
 
-function handleMessageUpdate(state: TuiViewState, event: unknown): TuiViewState {
+function handleMessageUpdate(state: TuiViewState, event: TuiAssistantMessageEventLike): TuiViewState {
   if (!isObject(event) || event.type !== "text_delta" || typeof event.delta !== "string") {
     return state;
   }
@@ -128,7 +155,7 @@ function handleMessageUpdate(state: TuiViewState, event: unknown): TuiViewState 
   return { ...state, rows };
 }
 
-function handleMessageEnd(state: TuiViewState, message: unknown): TuiViewState {
+function handleMessageEnd(state: TuiViewState, message: TuiMessageLike): TuiViewState {
   if (!isObject(message) || message.role !== "assistant") {
     return state;
   }
@@ -156,6 +183,20 @@ function updateToolRow(
 
 function appendRow(state: TuiViewState, row: TuiRow): TuiViewState {
   return { ...state, rows: [...state.rows, row] };
+}
+
+function formatToolResultView(result: unknown): Pick<
+  Extract<TuiRow, { kind: "tool" }>,
+  "result" | "fullResult" | "resultTruncated"
+> {
+  const preview = formatToolResult(result, TOOL_RESULT_PREVIEW_CHARS);
+  const fullResult = formatToolResult(result, TOOL_RESULT_EXPANDED_CHARS);
+
+  return {
+    result: preview,
+    fullResult,
+    resultTruncated: preview !== fullResult,
+  };
 }
 
 function textFromMessage(message: Record<string, unknown>): string {

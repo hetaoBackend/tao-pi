@@ -189,6 +189,43 @@ describe("createCommandTools", () => {
     });
   });
 
+  it("kills timeout commands that ignore SIGTERM", async () => {
+    const runTool = createCommandTools(workspaceRoot).find((tool) => tool.name === "bash");
+    const pidPath = join(workspaceRoot, "stubborn.pid");
+    let pid: number | undefined;
+    const runPromise = runTool!.execute("call-1", {
+      command: [
+        "node -e",
+        JSON.stringify(
+          [
+            "const fs = require('node:fs');",
+            "fs.writeFileSync('stubborn.pid', String(process.pid));",
+            "process.on('SIGTERM', () => {});",
+            "setInterval(() => {}, 1000);",
+          ].join(""),
+        ),
+      ].join(" "),
+      timeout_ms: 100,
+    });
+
+    try {
+      pid = await waitForPidFile(pidPath);
+      expect(await waitForProcessExit(pid, 1000)).toBe(true);
+
+      const result = await runPromise;
+      expect(result.details).toMatchObject({
+        exitCode: null,
+        timedOut: true,
+        timeoutMs: 100,
+      });
+    } finally {
+      if (pid !== undefined && isProcessRunning(pid)) {
+        process.kill(pid, "SIGKILL");
+      }
+      await runPromise.catch(() => undefined);
+    }
+  }, 3000);
+
   it("rejects unsafe commands unless explicitly allowed", async () => {
     await writeFile(join(workspaceRoot, "marker.txt"), "keep", "utf8");
     const runTool = createCommandTools(workspaceRoot).find((tool) => tool.name === "bash");
@@ -225,3 +262,50 @@ describe("createCommandTools", () => {
     expect(result?.details).toMatchObject({ exitCode: 0, timedOut: false });
   });
 });
+
+async function waitForPidFile(path: string): Promise<number> {
+  const deadline = Date.now() + 1000;
+  while (Date.now() < deadline) {
+    try {
+      return Number(await readFile(path, "utf8"));
+    } catch {
+      await delay(20);
+    }
+  }
+
+  throw new Error(`Timed out waiting for pid file: ${path}`);
+}
+
+async function waitForProcessExit(pid: number, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!isProcessRunning(pid)) {
+      return true;
+    }
+    await delay(20);
+  }
+
+  return !isProcessRunning(pid);
+}
+
+function isProcessRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ESRCH") {
+      return false;
+    }
+    throw error;
+  }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error;
+}
