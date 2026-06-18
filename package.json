@@ -3,8 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "tao-pi": "./dist/tao-pi"
+  },
   "scripts": {
     "dev": "tsx src/index.ts",
+    "build:cli": "bun build --compile --target=bun --outfile=dist/tao-pi src/index.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
@@ -19,6 +23,7 @@
   "devDependencies": {
     "@types/node": "24.0.3",
     "@types/react": "^19.2.17",
+    "react-devtools-core": "^7.0.1",
     "tsx": "4.20.3",
     "typescript": "5.8.3",
     "vitest": "3.2.4"

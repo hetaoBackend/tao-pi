@@ -9,6 +9,7 @@ import { runStreamingPrompt } from "./agent/streaming-prompt.js";
 import { buildSystemPrompt } from "./agent/system-prompt.js";
 import { parseCliArgs } from "./cli/args.js";
 import { APP_VERSION } from "./cli/app-info.js";
+import { resolveCliCommandName } from "./cli/command-name.js";
 import { runMultiTurnConversation } from "./cli/conversation.js";
 import { shouldUseTui } from "./cli/runtime-mode.js";
 import { readPipedStdin } from "./cli/stdin.js";
@@ -29,7 +30,7 @@ main().catch((error: unknown) => {
 
 async function main(): Promise<void> {
   const cliArgs = parseCliArgs(process.argv.slice(2));
-  const commandName = "tsx src/index.ts";
+  const commandName = resolveCliCommandName(process.argv);
 
   if (cliArgs.help) {
     stdout.write(renderCliHelp(commandName));
