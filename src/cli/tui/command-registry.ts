@@ -18,6 +18,7 @@ export const BUILTIN_TUI_COMMANDS: readonly TuiCommand[] = [
   { name: "help", description: "Show commands, or details for one command.", source: "builtin" },
   { name: "session", description: "Show current session details.", source: "builtin" },
   { name: "clear", description: "Clear the visible terminal transcript.", source: "builtin" },
+  { name: "tool", description: "Toggle one folded tool output by number.", source: "builtin" },
   { name: "exit", description: "Exit the TUI session.", source: "builtin" },
   { name: "quit", description: "Exit the TUI session.", source: "builtin" },
 ];

@@ -28,6 +28,7 @@ describe("tui command registry", () => {
       "help",
       "session",
       "clear",
+      "tool",
       "exit",
       "quit",
       "research",
@@ -58,6 +59,12 @@ describe("tui command registry", () => {
       name: "help",
       args: "review",
       raw: "/help review",
+    });
+    expect(resolveTuiSubmission("/tool 2", commands)).toEqual({
+      type: "builtin",
+      name: "tool",
+      args: "2",
+      raw: "/tool 2",
     });
   });
 

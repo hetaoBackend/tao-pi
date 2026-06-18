@@ -70,6 +70,7 @@ export type TuiViewAction =
   | { type: "tool_execution_end"; toolCallId: string; toolName: string; result: TuiToolResultLike; isError: boolean }
   | { type: "toggle_tool_results" }
   | { type: "toggle_tool_result"; toolCallId: string }
+  | { type: "toggle_tool_result_at_index"; index: number }
   | { type: "steer_queued"; text: string }
   | { type: "next_user_message_display"; text: string }
   | { type: "clear_next_user_message_display" }
@@ -123,6 +124,8 @@ export function reduceTuiViewState(state: TuiViewState, action: TuiViewAction): 
       return { ...state, toolResultsExpanded: !state.toolResultsExpanded };
     case "toggle_tool_result":
       return updateToolRow(state, action.toolCallId, (row) => ({ resultExpanded: !row.resultExpanded }));
+    case "toggle_tool_result_at_index":
+      return updateToolRowAtVisibleIndex(state, action.index, (row) => ({ resultExpanded: !row.resultExpanded }));
     case "steer_queued":
       return appendRow(state, { kind: "steering", text: action.text });
     case "next_user_message_display":
@@ -140,6 +143,10 @@ export function reduceTuiViewState(state: TuiViewState, action: TuiViewAction): 
 
 export function selectLatestTodos(state: TuiViewState): TodoViewItem[] {
   return state.latestTodos;
+}
+
+export function isFoldableToolRow(row: TuiRow): row is Extract<TuiRow, { kind: "tool" }> {
+  return row.kind === "tool" && row.toolName !== "write_file" && Boolean(row.result || row.fullResult);
 }
 
 function handleMessageStart(state: TuiViewState, message: TuiMessageLike): TuiViewState {
@@ -204,6 +211,33 @@ function updateToolRow(
         ? { ...row, ...(typeof patch === "function" ? patch(row) : patch) }
         : row,
     ),
+  };
+}
+
+function updateToolRowAtVisibleIndex(
+  state: TuiViewState,
+  index: number,
+  patch:
+    | Partial<Extract<TuiRow, { kind: "tool" }>>
+    | ((row: Extract<TuiRow, { kind: "tool" }>) => Partial<Extract<TuiRow, { kind: "tool" }>>),
+): TuiViewState {
+  if (!Number.isInteger(index) || index < 1) {
+    return state;
+  }
+
+  let visibleIndex = 0;
+  return {
+    ...state,
+    rows: state.rows.map((row) => {
+      if (!isFoldableToolRow(row)) {
+        return row;
+      }
+
+      visibleIndex += 1;
+      return visibleIndex === index
+        ? { ...row, ...(typeof patch === "function" ? patch(row) : patch) }
+        : row;
+    }),
   };
 }
 
