@@ -146,16 +146,18 @@ export function InputBox({ commands, streaming, onSubmit, onAbort, onToggleToolR
   });
 
   const placeholder = streaming ? "steer current run" : "ask TaoPi";
+  const containerRef = useRef(null);
   const inputRef = useRef(null);
-  const metrics = useBoxMetrics(inputRef);
+  const containerMetrics = useBoxMetrics(containerRef);
+  const inputMetrics = useBoxMetrics(inputRef);
   const { setCursorPosition } = useCursor();
 
-  if (metrics.hasMeasured) {
+  if (containerMetrics.hasMeasured && inputMetrics.hasMeasured) {
     setCursorPosition(getInputCursorPosition(getAbsoluteLayoutPosition(inputRef.current), editor.text, editor.cursorOffset));
   }
 
   return (
-    <Box flexDirection="column">
+    <Box ref={containerRef} flexDirection="column">
       {pickerOpen ? <CommandList commands={filteredCommands} selectedIndex={selectedIndex} /> : null}
       <Box ref={inputRef} borderStyle="single" borderColor={tuiTheme.colors.border} paddingX={1} columnGap={1}>
         <Text color={streaming ? tuiTheme.colors.warning : tuiTheme.colors.primary}>{tuiTheme.symbols.prompt}</Text>

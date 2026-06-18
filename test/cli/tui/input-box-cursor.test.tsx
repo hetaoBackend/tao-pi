@@ -5,6 +5,7 @@ import { InputBox } from "../../../src/cli/tui/components/input-box.js";
 
 const cursorEvents = vi.hoisted(() => ({
   committed: [] as unknown[],
+  metricSubscriptions: 0,
   setCalls: [] as unknown[],
 }));
 
@@ -14,7 +15,10 @@ vi.mock("ink", async () => {
 
   return {
     ...actual,
-    useBoxMetrics: () => ({ width: 0, height: 0, left: 0, top: 0, hasMeasured: true }),
+    useBoxMetrics: () => {
+      cursorEvents.metricSubscriptions += 1;
+      return { width: 0, height: 0, left: 0, top: 0, hasMeasured: true };
+    },
     useCursor: () => {
       const positionRef = react.useRef<unknown>(undefined);
 
@@ -36,6 +40,7 @@ vi.mock("ink", async () => {
 describe("tui input box cursor", () => {
   it("sets the terminal cursor position during render for IME placement", () => {
     cursorEvents.committed.length = 0;
+    cursorEvents.metricSubscriptions = 0;
     cursorEvents.setCalls.length = 0;
 
     renderToString(
@@ -50,5 +55,21 @@ describe("tui input box cursor", () => {
 
     expect(cursorEvents.setCalls).toContainEqual({ x: 4, y: 1 });
     expect(cursorEvents.committed).toContainEqual({ x: 4, y: 1 });
+  });
+
+  it("tracks ancestor movement so cursor y updates after transcript growth", () => {
+    cursorEvents.metricSubscriptions = 0;
+
+    renderToString(
+      <InputBox
+        commands={[]}
+        streaming={false}
+        onSubmit={() => {}}
+        onAbort={() => {}}
+        onToggleToolResults={() => {}}
+      />,
+    );
+
+    expect(cursorEvents.metricSubscriptions).toBeGreaterThanOrEqual(2);
   });
 });
