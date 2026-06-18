@@ -4,13 +4,20 @@
 
 TaoPi is a small TypeScript general-purpose agent CLI with five main runtime responsibilities:
 
-- `agent`: model selection, system prompt construction, context transforms, and streamed event rendering
+- `agent`: model selection, system prompt construction, project context loading, and streamed event rendering
 - `cli`: argument parsing, terminal text, slash commands, the interactive TUI, and the plain fallback loop
 - `tools`: core agent tool adapters for workspace files, local commands, and Firecrawl
 - `plugins`: optional non-core capabilities that can contribute tools and system-prompt guidance
 - `persistence`: SQLite-backed session storage
 
 `src/index.ts` is the composition root. It should stay as the place where these modules are wired together.
+
+Runtime defaults can be stored globally in `~/.tao/config.toml`, which makes model,
+API key, plugin, memory, skill, session, timezone, and Firecrawl settings reusable
+across workspaces. The `setup` command writes this file interactively. CLI flags and
+environment variables still override global config for one-off runs, with precedence
+ordered as CLI flags, environment variables, global TOML config, then built-in
+defaults.
 
 The minimal base agent includes the core local loop directly, not as plugins:
 
@@ -31,7 +38,6 @@ Non-core features should be added as plugins first. A plugin has an id, optional
 src/
 ├── index.ts
 ├── agent/
-│   ├── context-transform.ts
 │   ├── model-config.ts
 │   ├── project-context.ts
 │   ├── streaming-prompt.ts

@@ -11,7 +11,7 @@ export interface TuiCommand {
 
 export type TuiSubmission =
   | { type: "builtin"; name: string; args: string; raw: string }
-  | { type: "prompt"; prompt: string; raw: string; sourceCommand?: string }
+  | { type: "prompt"; prompt: string; raw: string; displayText?: string; sourceCommand?: string }
   | { type: "error"; message: string; raw: string };
 
 export const BUILTIN_TUI_COMMANDS: readonly TuiCommand[] = [
@@ -78,6 +78,7 @@ export function resolveTuiSubmission(rawInput: string, commands: readonly TuiCom
     type: "prompt",
     prompt: command.toPrompt?.({ command: command.name, args: parsed.args, raw }) ?? raw,
     raw,
+    displayText: raw,
     sourceCommand: command.name,
   };
 }

@@ -99,4 +99,16 @@ describe("parseCliArgs", () => {
       firstPrompt: "",
     });
   });
+
+  it("parses setup as a top-level command", () => {
+    expect(parseCliArgs(["setup"])).toEqual({
+      command: "setup",
+      resume: false,
+      print: false,
+      debug: false,
+      help: false,
+      overrides: {},
+      firstPrompt: "",
+    });
+  });
 });

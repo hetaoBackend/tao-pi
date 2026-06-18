@@ -65,6 +65,7 @@ describe("cli ui", () => {
     ]);
 
     expect(text).toContain("Usage: tsx src/index.ts [options] [prompt]");
+    expect(text).toContain("Usage: tsx src/index.ts setup");
     expect(text).toContain("-p, --print");
     expect(text).toContain("-r, --resume [session-id]");
     expect(text).toContain("-c, --continue");

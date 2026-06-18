@@ -114,6 +114,7 @@ describe("createSkillsPlugin", () => {
     expect(plugin.tools?.map((tool) => tool.name)).toEqual(["skill_read"]);
     expect(plugin.slashCommands?.map((command) => command.name)).toEqual(["research"]);
     expect(plugin.slashCommands?.[0]?.description).toBe("Research a topic and synthesize sources.");
+    expect(plugin.slashCommands?.[0]?.kind).toBe("skill");
     expect(plugin.systemPromptSections?.join("\n")).toContain("Available skills:");
     expect(plugin.systemPromptSections?.join("\n")).toContain("- research: Research a topic and synthesize sources.");
     expect(plugin.systemPromptSections?.join("\n")).toContain(join(skillsRoot, "research", "SKILL.md"));
@@ -138,6 +139,40 @@ describe("createSkillsPlugin", () => {
           "User request: compare local options",
         ].join("\n"),
       );
+  });
+
+  it("exposes every discovered skill as a same-name slash command", () => {
+    writeSkill("research", [
+      "---",
+      "name: research",
+      "description: Research a topic and synthesize sources.",
+      "---",
+    ].join("\n"));
+    writeSkill("tdd", [
+      "---",
+      "name: superpowers:test-driven-development",
+      "description: Use test-driven development.",
+      "---",
+    ].join("\n"));
+
+    const commands = createSkillsPlugin({ skillDirs: [skillsRoot] }).slashCommands ?? [];
+    const tddCommand = commands.find((command) => command.name === "superpowers:test-driven-development");
+
+    expect(commands.map((command) => command.name)).toEqual(["research", "superpowers:test-driven-development"]);
+    expect(commands.every((command) => command.kind === "skill")).toBe(true);
+    expect(
+      tddCommand?.toPrompt({
+        command: "superpowers:test-driven-development",
+        args: "add coverage first",
+        raw: "/superpowers:test-driven-development add coverage first",
+      }),
+    ).toBe(
+      [
+        'Use the "superpowers:test-driven-development" skill for this request.',
+        'First call skill_read with name "superpowers:test-driven-development" and follow the loaded SKILL.md instructions before answering.',
+        "User request: add coverage first",
+      ].join("\n"),
+    );
   });
 
   it("does not add prompt guidance when no skills are discovered", () => {

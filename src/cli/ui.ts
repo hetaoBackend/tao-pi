@@ -67,8 +67,10 @@ export function renderSessionSummary(options: SessionSummaryOptions): string {
 export function renderCliHelp(commandName: string, slashCommands: readonly HelpSlashCommand[] = []): string {
   const lines = [
     `Usage: ${commandName} [options] [prompt]`,
+    `Usage: ${commandName} setup`,
     "",
     "Starts an interactive session by default. Use -p/--print for one-shot output.",
+    "Run setup to write global defaults to ~/.tao/config.toml.",
     "",
     "Options:",
     "  -p, --print                  Print the response and exit",

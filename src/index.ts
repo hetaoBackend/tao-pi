@@ -2,7 +2,6 @@ import { Agent } from "@earendil-works/pi-agent-core";
 import { getEnvApiKey } from "@earendil-works/pi-ai";
 import { stderr, stdin, stdout } from "node:process";
 import { createInterface } from "node:readline/promises";
-import { createTransformContext, prefixLatestUserTextMessage } from "./agent/context-transform.js";
 import { resolveConfiguredModel } from "./agent/model-config.js";
 import { loadProjectContext } from "./agent/project-context.js";
 import { runStreamingPrompt } from "./agent/streaming-prompt.js";
@@ -12,6 +11,7 @@ import { APP_VERSION } from "./cli/app-info.js";
 import { resolveCliCommandName } from "./cli/command-name.js";
 import { runMultiTurnConversation } from "./cli/conversation.js";
 import { shouldUseTui } from "./cli/runtime-mode.js";
+import { askTerminalSetupPrompt, runSetupCommand } from "./cli/setup.js";
 import { readPipedStdin } from "./cli/stdin.js";
 import { renderCliHelp, renderSessionSummary, renderWelcome } from "./cli/ui.js";
 import { loadAppConfig } from "./config.js";
@@ -37,11 +37,21 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (cliArgs.command === "setup") {
+    await runSetupCommand({
+      env: process.env,
+      output: stdout,
+      ask: (prompt) => askTerminalSetupPrompt(stdin, stdout, prompt),
+    });
+    return;
+  }
+
   const config = loadAppConfig({
     cwd: process.cwd(),
     env: process.env,
     overrides: cliArgs.overrides,
     debugFlag: cliArgs.debug,
+    getProviderApiKey: getConfiguredProviderApiKey,
   });
   const modelLabel = `${config.provider}/${config.modelId}`;
   const projectContext = await loadProjectContext({ workspaceRoot: config.workspaceRoot });
@@ -72,7 +82,7 @@ async function main(): Promise<void> {
     baseUrl: config.modelBaseUrl,
     compat: config.modelCompat,
   });
-  const apiKey = process.env.PI_API_KEY ?? getEnvApiKey(config.provider);
+  const apiKey = config.apiKey;
   const sessionStore = await SqliteSessionStore.open(config.sessionDbPath);
   const resumeTarget = cliArgs.resumeTarget ?? "latest";
   const session = cliArgs.resume
@@ -84,7 +94,7 @@ async function main(): Promise<void> {
 
   if (!apiKey) {
     throw new Error(
-      `No API key found for provider "${config.provider}". Set PI_API_KEY or the provider-specific API key env var.`,
+      `No API key found for provider "${config.provider}". Set PI_API_KEY, the provider-specific API key env var, or run setup.`,
     );
   }
 
@@ -100,19 +110,6 @@ async function main(): Promise<void> {
       messages: session.messages,
     },
     getApiKey: () => apiKey,
-    transformContext: createTransformContext({
-      sessionId: session.id,
-      transform: ({ messages, sessionId }) => {
-        if (!config.contextPrefix) {
-          return messages;
-        }
-
-        return prefixLatestUserTextMessage(
-          messages,
-          `[transformContext session=${sessionId}]\n${config.contextPrefix}\n`,
-        );
-      },
-    }),
   });
 
   const saveCurrentSession = () =>
@@ -237,4 +234,13 @@ async function main(): Promise<void> {
   } finally {
     readline.close();
   }
+}
+
+function getConfiguredProviderApiKey(provider: string, env: NodeJS.ProcessEnv): string | undefined {
+  const providerEnv = Object.fromEntries(Object.entries(env).filter(hasEnvValue));
+  return getEnvApiKey(provider, providerEnv);
+}
+
+function hasEnvValue(entry: [string, string | undefined]): entry is [string, string] {
+  return entry[1] !== undefined;
 }

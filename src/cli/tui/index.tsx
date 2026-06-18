@@ -84,8 +84,13 @@ export async function handleTuiInput(rawInput: string, options: TuiControllerOpt
   if (shouldSteer(options.agent.state.isStreaming)) {
     const message = createUserTextMessage(submission.prompt);
     options.agent.steer(message);
-    options.dispatch({ type: "steer_queued", text: submission.prompt });
+    options.dispatch({ type: "steer_queued", text: submission.displayText ?? submission.prompt });
     return;
+  }
+
+  const shouldOverrideUserMessage = Boolean(submission.displayText && submission.displayText !== submission.prompt);
+  if (shouldOverrideUserMessage && submission.displayText) {
+    options.dispatch({ type: "next_user_message_display", text: submission.displayText });
   }
 
   try {
@@ -97,6 +102,10 @@ export async function handleTuiInput(rawInput: string, options: TuiControllerOpt
       text: error instanceof Error ? error.message : String(error),
       tone: "error",
     });
+  } finally {
+    if (shouldOverrideUserMessage) {
+      options.dispatch({ type: "clear_next_user_message_display" });
+    }
   }
 }
 

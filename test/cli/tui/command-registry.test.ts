@@ -67,6 +67,7 @@ describe("tui command registry", () => {
     expect(resolveTuiSubmission("/research local tui", commands)).toEqual({
       type: "prompt",
       prompt: "Use research skill: local tui",
+      displayText: "/research local tui",
       raw: "/research local tui",
       sourceCommand: "research",
     });

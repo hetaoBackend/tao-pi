@@ -48,6 +48,7 @@ export interface TuiViewState {
   toolResultsExpanded: boolean;
   rows: TuiRow[];
   latestTodos: TodoViewItem[];
+  nextUserMessageDisplayText?: string;
 }
 
 export type TuiViewAction =
@@ -63,6 +64,8 @@ export type TuiViewAction =
   | { type: "tool_execution_end"; toolCallId: string; toolName: string; result: TuiToolResultLike; isError: boolean }
   | { type: "toggle_tool_results" }
   | { type: "steer_queued"; text: string }
+  | { type: "next_user_message_display"; text: string }
+  | { type: "clear_next_user_message_display" }
   | { type: "clear_rows" }
   | { type: "system_message"; text: string; tone?: "info" | "error" };
 
@@ -110,8 +113,12 @@ export function reduceTuiViewState(state: TuiViewState, action: TuiViewAction): 
       return { ...state, toolResultsExpanded: !state.toolResultsExpanded };
     case "steer_queued":
       return appendRow(state, { kind: "steering", text: action.text });
+    case "next_user_message_display":
+      return { ...state, nextUserMessageDisplayText: action.text };
+    case "clear_next_user_message_display":
+      return clearNextUserMessageDisplay(state);
     case "clear_rows":
-      return { ...state, rows: [], latestTodos: [] };
+      return clearNextUserMessageDisplay({ ...state, rows: [], latestTodos: [] });
     case "system_message":
       return appendRow(state, { kind: "system", text: action.text, tone: action.tone });
     default:
@@ -129,7 +136,8 @@ function handleMessageStart(state: TuiViewState, message: TuiMessageLike): TuiVi
   }
 
   if (message.role === "user") {
-    return appendRow(state, { kind: "user", text: textFromMessage(message) });
+    const text = state.nextUserMessageDisplayText ?? textFromMessage(message);
+    return appendRow(clearNextUserMessageDisplay(state), { kind: "user", text });
   }
 
   if (message.role === "assistant" && state.rows[state.rows.length - 1]?.kind !== "assistant") {
@@ -183,6 +191,11 @@ function updateToolRow(
 
 function appendRow(state: TuiViewState, row: TuiRow): TuiViewState {
   return { ...state, rows: [...state.rows, row] };
+}
+
+function clearNextUserMessageDisplay(state: TuiViewState): TuiViewState {
+  const { nextUserMessageDisplayText: _nextUserMessageDisplayText, ...rest } = state;
+  return rest;
 }
 
 function formatToolResultView(result: unknown): Pick<
