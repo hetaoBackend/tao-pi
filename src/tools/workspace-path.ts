@@ -68,7 +68,7 @@ async function assertWritablePathInsideWorkspace(root: string, target: string): 
 
       const parent = dirname(nearestExistingPath);
       if (parent === nearestExistingPath) {
-        throw error;
+        throw new Error(`Path not found: ${toDisplayPath(root, target)}`);
       }
       nearestExistingPath = parent;
     }

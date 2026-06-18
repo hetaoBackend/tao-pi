@@ -834,7 +834,7 @@ function formatReadFileResult(
   const endIndex = Math.min(startIndex + options.maxLines, totalLines);
   const visibleLines = lines.slice(startIndex, endIndex);
   const truncated = options.startLine > 1 || endIndex < totalLines;
-  const startLine = visibleLines.length ? startIndex + 1 : options.startLine;
+  const startLine = visibleLines.length ? startIndex + 1 : Math.min(options.startLine, Math.max(totalLines, 1));
   const endLine = visibleLines.length ? endIndex : startLine - 1;
   const body = visibleLines.join("\n");
   const displayBody = options.showLineNumbers ? formatNumberedLines(visibleLines, startLine) : body;

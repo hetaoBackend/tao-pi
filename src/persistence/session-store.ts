@@ -68,10 +68,13 @@ export class SqliteSessionStore {
   async load(id: string): Promise<AgentSession> {
     assertValidSessionId(id);
 
-    const sessionRows = this.db.exec("SELECT id FROM sessions WHERE id = ? LIMIT 1", [id]);
-    if (!sessionRows[0]?.values[0]) {
-      throw new Error(`Session "${id}" not found`);
-    }
+    await withSessionStoreLock(this.dbPath, async () => {
+      await this.mergeFromDisk();
+      const sessionRows = this.db.exec("SELECT id FROM sessions WHERE id = ? LIMIT 1", [id]);
+      if (!sessionRows[0]?.values[0]) {
+        throw new Error(`Session "${id}" not found`);
+      }
+    });
 
     return {
       id,
@@ -200,7 +203,11 @@ export class SqliteSessionStore {
 
       this.db.run("COMMIT");
     } catch (error) {
-      this.db.run("ROLLBACK");
+      try {
+        this.db.run("ROLLBACK");
+      } catch {
+        // Ignore rollback failure; preserve original error
+      }
       throw error;
     } finally {
       diskDb.close();
@@ -232,7 +239,11 @@ export class SqliteSessionStore {
 
       this.db.run("COMMIT");
     } catch (error) {
-      this.db.run("ROLLBACK");
+      try {
+        this.db.run("ROLLBACK");
+      } catch {
+        // Ignore rollback failure; preserve original error
+      }
       throw error;
     }
   }
