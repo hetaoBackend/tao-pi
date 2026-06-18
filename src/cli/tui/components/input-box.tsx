@@ -1,5 +1,5 @@
-import { Box, Text, useBoxMetrics, useCursor, useInput } from "ink";
-import { useMemo, useRef, useState } from "react";
+import { Box, Text, useInput } from "ink";
+import { useMemo, useState } from "react";
 import {
   filterTuiCommands,
   getSlashCommandQuery,
@@ -16,6 +16,7 @@ import {
   type InputEditorState,
 } from "../input-editor.js";
 import { tuiTheme } from "../theme.js";
+import { isSgrMouseInput } from "../mouse.js";
 import { CommandList } from "./command-list.js";
 
 export interface InputBoxProps {
@@ -31,15 +32,7 @@ export interface InputTextSegments {
   after: string;
 }
 
-export interface LayoutPosition {
-  left: number;
-  top: number;
-}
-
-export interface TerminalCursorPosition {
-  x: number;
-  y: number;
-}
+export const INPUT_CURSOR = "|";
 
 export function InputBox({ commands, streaming, onSubmit, onAbort, onToggleToolResults }: InputBoxProps) {
   const [editor, setEditor] = useState<InputEditorState>({ text: "", cursorOffset: 0 });
@@ -61,6 +54,10 @@ export function InputBox({ commands, streaming, onSubmit, onAbort, onToggleToolR
   };
 
   useInput((input, key) => {
+    if (isMouseInput(input)) {
+      return;
+    }
+
     if (key.ctrl && input === "c") {
       onAbort();
       return;
@@ -146,20 +143,11 @@ export function InputBox({ commands, streaming, onSubmit, onAbort, onToggleToolR
   });
 
   const placeholder = streaming ? "steer current run" : "ask TaoPi";
-  const containerRef = useRef(null);
-  const inputRef = useRef(null);
-  const containerMetrics = useBoxMetrics(containerRef);
-  const inputMetrics = useBoxMetrics(inputRef);
-  const { setCursorPosition } = useCursor();
-
-  if (containerMetrics.hasMeasured && inputMetrics.hasMeasured) {
-    setCursorPosition(getInputCursorPosition(getAbsoluteLayoutPosition(inputRef.current), editor.text, editor.cursorOffset));
-  }
 
   return (
-    <Box ref={containerRef} flexDirection="column">
+    <Box flexDirection="column">
       {pickerOpen ? <CommandList commands={filteredCommands} selectedIndex={selectedIndex} /> : null}
-      <Box ref={inputRef} borderStyle="single" borderColor={tuiTheme.colors.border} paddingX={1} columnGap={1}>
+      <Box borderStyle="single" borderColor={tuiTheme.colors.border} paddingX={1} columnGap={1}>
         <Text color={streaming ? tuiTheme.colors.warning : tuiTheme.colors.primary}>{tuiTheme.symbols.prompt}</Text>
         <InputText editor={editor} placeholder={placeholder} />
       </Box>
@@ -173,7 +161,7 @@ function InputText({ editor, placeholder }: { editor: InputEditorState; placehol
   if (!editor.text) {
     return (
       <Box>
-        <Text> </Text>
+        <Text color={tuiTheme.colors.primary}>{INPUT_CURSOR}</Text>
         <Text color={tuiTheme.colors.dim}>{placeholder}</Text>
       </Box>
     );
@@ -182,6 +170,7 @@ function InputText({ editor, placeholder }: { editor: InputEditorState; placehol
   return (
     <Box>
       <Text>{segments.before}</Text>
+      <Text color={tuiTheme.colors.primary}>{INPUT_CURSOR}</Text>
       <Text>{segments.after}</Text>
     </Box>
   );
@@ -191,6 +180,10 @@ export function isToggleToolResultsInput(input: string, key: { ctrl?: boolean })
   return Boolean(key.ctrl && input === "o");
 }
 
+export function isMouseInput(input: string): boolean {
+  return isSgrMouseInput(input);
+}
+
 export function getInputTextSegments(text: string, cursorOffset: number): InputTextSegments {
   const safeOffset = Math.max(0, Math.min(cursorOffset, text.length));
 
@@ -198,79 +191,4 @@ export function getInputTextSegments(text: string, cursorOffset: number): InputT
     before: text.slice(0, safeOffset),
     after: text.slice(safeOffset),
   };
-}
-
-export function getInputCursorPosition(
-  inputBoxPosition: LayoutPosition,
-  text: string,
-  cursorOffset: number,
-): TerminalCursorPosition {
-  const beforeText = text.slice(0, Math.max(0, Math.min(cursorOffset, text.length)));
-  return {
-    x: inputBoxPosition.left + 4 + stringWidth(beforeText),
-    y: inputBoxPosition.top + 1,
-  };
-}
-
-export function getAbsoluteLayoutPosition(node: unknown): LayoutPosition {
-  let left = 0;
-  let top = 0;
-  let current = node;
-
-  while (isLayoutNode(current)) {
-    const layout = current.yogaNode?.getComputedLayout?.();
-    left += numberValue(layout?.left);
-    top += numberValue(layout?.top);
-    current = current.parentNode;
-  }
-
-  return { left, top };
-}
-
-/**
- * Calculate the display width of a string in terminal columns.
- * CJK characters and fullwidth forms occupy 2 columns.
- */
-function stringWidth(text: string): number {
-  let width = 0;
-  for (const char of text) {
-    const code = char.codePointAt(0) ?? 0;
-    // CJK Unified Ideographs, Hangul, Japanese, fullwidth forms, etc.
-    if (
-      (code >= 0x1100 && code <= 0x115f) || // Hangul Jamo
-      (code >= 0x2e80 && code <= 0xa4cf) || // CJK radicals, Hiragana, Katakana, Bopomofo, etc.
-      (code >= 0xa960 && code <= 0xa97f) || // Hangul Jamo Extended-A
-      (code >= 0xac00 && code <= 0xd7af) || // Hangul Syllables
-      (code >= 0xd7b0 && code <= 0xd7ff) || // Hangul Jamo Extended-B
-      (code >= 0xf900 && code <= 0xfaff) || // CJK Compatibility Ideographs
-      (code >= 0xfe10 && code <= 0xfe19) || // Vertical forms
-      (code >= 0xfe30 && code <= 0xfe6f) || // CJK Compatibility Forms
-      (code >= 0xff00 && code <= 0xff60) || // Fullwidth ASCII variants
-      (code >= 0xffe0 && code <= 0xffe6) || // Fullwidth symbol variants
-      (code >= 0x1f300 && code <= 0x1f64f) || // Emojis
-      (code >= 0x1f900 && code <= 0x1f9ff) // Supplemental Symbols and Pictographs
-    ) {
-      width += 2;
-    } else if (code >= 0x300 && code <= 0x36f) {
-      // Combining marks: zero width
-    } else {
-      width += 1;
-    }
-  }
-  return width;
-}
-
-interface LayoutNodeLike {
-  parentNode?: unknown;
-  yogaNode?: {
-    getComputedLayout?: () => { left?: unknown; top?: unknown };
-  };
-}
-
-function isLayoutNode(value: unknown): value is LayoutNodeLike {
-  return Boolean(value && typeof value === "object" && ("parentNode" in value || "yogaNode" in value));
-}
-
-function numberValue(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }

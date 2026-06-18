@@ -117,7 +117,7 @@ describe("tui components", () => {
     expect(output).not.toContain("**");
   });
 
-  it("renders collapsed or expanded tool results", () => {
+  it("hides folded tool results until that row is expanded", () => {
     const rows = [
       {
         kind: "tool" as const,
@@ -128,16 +128,89 @@ describe("tui components", () => {
         result: "abcdefghij...",
         fullResult: "abcdefghijklmnopqrstuvwxyz",
         resultTruncated: true,
+        resultExpanded: false,
         status: "ok" as const,
       },
     ];
 
     const collapsed = renderToString(<MessageHistory rows={rows} toolResultsExpanded={false} />);
-    const expanded = renderToString(<MessageHistory rows={rows} toolResultsExpanded />);
+    const expanded = renderToString(
+      <MessageHistory rows={[{ ...rows[0], resultExpanded: true }]} toolResultsExpanded={false} />,
+    );
 
-    expect(collapsed).toContain("abcdefghij...");
+    expect(collapsed).toContain("Run command");
+    expect(collapsed).not.toContain("abcdefghij");
     expect(collapsed).not.toContain("klmnopqrstuvwxyz");
     expect(expanded).toContain("abcdefghijklmnopqrstuvwxyz");
+  });
+
+  it("can still expand every folded tool result through the global toggle", () => {
+    const output = renderToString(
+      <MessageHistory
+        toolResultsExpanded
+        rows={[
+          {
+            kind: "tool",
+            toolCallId: "call-1",
+            toolName: "bash",
+            title: "Run command",
+            detail: "printf",
+            result: "abcdefghij...",
+            fullResult: "abcdefghijklmnopqrstuvwxyz",
+            resultTruncated: true,
+            status: "ok",
+          },
+        ]}
+      />,
+    );
+
+    expect(output).toContain("abcdefghijklmnopqrstuvwxyz");
+  });
+
+  it("folds non-write-file tool results until that row is expanded", () => {
+    const row = {
+      kind: "tool" as const,
+      toolCallId: "call-1",
+      toolName: "web_search",
+      title: "Search web",
+      detail: "pi",
+      result: "Search results for pi",
+      fullResult: "Search results for pi",
+      resultTruncated: false,
+      status: "ok" as const,
+    };
+
+    const collapsed = renderToString(<MessageHistory rows={[row]} />);
+    const expanded = renderToString(
+      <MessageHistory rows={[{ ...row, resultExpanded: true }]} toolResultsExpanded={false} />,
+    );
+
+    expect(collapsed).toContain("Search web");
+    expect(collapsed).not.toContain("Search results for pi");
+    expect(expanded).toContain("Search results for pi");
+  });
+
+  it("keeps write_file result previews visible by default", () => {
+    const output = renderToString(
+      <MessageHistory
+        rows={[
+          {
+            kind: "tool",
+            toolCallId: "call-1",
+            toolName: "write_file",
+            title: "Write file",
+            detail: "src/file.ts",
+            result: "Wrote src/file.ts",
+            fullResult: "Wrote src/file.ts with more detail",
+            resultTruncated: true,
+            status: "ok",
+          },
+        ]}
+      />,
+    );
+
+    expect(output).toContain("Wrote src/file.ts");
+    expect(output).not.toContain("with more detail");
   });
 
   it("renders active todos and hides completed idle todos", () => {

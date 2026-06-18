@@ -13,6 +13,7 @@ import { TuiApp } from "./app.js";
 import {
   createInitialTuiViewState,
   reduceTuiViewState,
+  type TuiMessageLike,
   type TuiViewAction,
   type TuiViewState,
 } from "./view-state.js";
@@ -24,7 +25,7 @@ export interface UserTextMessage {
 }
 
 export interface TuiControllerAgent {
-  state: { isStreaming: boolean };
+  state: { isStreaming: boolean; messages?: readonly TuiMessageLike[] };
   prompt(input: string): Promise<unknown>;
   steer(message: UserTextMessage): void;
   abort(): void;
@@ -65,6 +66,10 @@ export function shouldSteer(isStreaming: boolean): boolean {
 
 export function createUserTextMessage(text: string): UserTextMessage {
   return { role: "user", content: [{ type: "text", text }], timestamp: Date.now() };
+}
+
+export function createInitialRuntimeViewState(agent: TuiControllerAgent): TuiViewState {
+  return createInitialTuiViewState(agent.state.messages ?? []);
 }
 
 export async function handleTuiInput(rawInput: string, options: TuiControllerOptions): Promise<void> {
@@ -118,7 +123,7 @@ export async function runTuiConversation(options: RunTuiConversationOptions): Pr
 
 function RuntimeApp(options: RunTuiConversationOptions) {
   const { exit } = useApp();
-  const [viewState, setViewState] = useState<TuiViewState>(() => createInitialTuiViewState());
+  const [viewState, setViewState] = useState<TuiViewState>(() => createInitialRuntimeViewState(options.agent));
   const commands = useMemo(() => buildTuiCommands(options.slashCommands), [options.slashCommands]);
 
   const dispatch = useCallback((action: TuiViewAction) => {
@@ -173,6 +178,13 @@ function RuntimeApp(options: RunTuiConversationOptions) {
     dispatch({ type: "toggle_tool_results" });
   }, [dispatch]);
 
+  const onToggleToolResult = useCallback(
+    (toolCallId: string) => {
+      dispatch({ type: "toggle_tool_result", toolCallId });
+    },
+    [dispatch],
+  );
+
   return (
     <TuiApp
       appVersion={options.appVersion}
@@ -191,6 +203,7 @@ function RuntimeApp(options: RunTuiConversationOptions) {
       onSubmit={onSubmit}
       onAbort={onAbort}
       onToggleToolResults={onToggleToolResults}
+      onToggleToolResult={onToggleToolResult}
     />
   );
 }

@@ -8,11 +8,16 @@ import {
   type TodoViewItem,
 } from "./message-format.js";
 
-interface TuiMessageLike {
+export interface TuiMessageLike {
   role?: unknown;
   content?: unknown;
   stopReason?: unknown;
   errorMessage?: unknown;
+  toolCallId?: unknown;
+  toolName?: unknown;
+  details?: unknown;
+  isError?: unknown;
+  timestamp?: unknown;
 }
 
 interface TuiAssistantMessageEventLike {
@@ -38,6 +43,7 @@ export type TuiRow =
       result?: string;
       fullResult?: string;
       resultTruncated?: boolean;
+      resultExpanded?: boolean;
       status: "running" | "ok" | "error";
     }
   | { kind: "steering"; text: string }
@@ -63,18 +69,22 @@ export type TuiViewAction =
   | { type: "tool_execution_update"; toolCallId: string; toolName: string; args?: unknown; partialResult: TuiToolResultLike }
   | { type: "tool_execution_end"; toolCallId: string; toolName: string; result: TuiToolResultLike; isError: boolean }
   | { type: "toggle_tool_results" }
+  | { type: "toggle_tool_result"; toolCallId: string }
   | { type: "steer_queued"; text: string }
   | { type: "next_user_message_display"; text: string }
   | { type: "clear_next_user_message_display" }
   | { type: "clear_rows" }
   | { type: "system_message"; text: string; tone?: "info" | "error" };
 
-export function createInitialTuiViewState(): TuiViewState {
+export function createInitialTuiViewState(messages: readonly TuiMessageLike[] = []): TuiViewState {
   return {
     streaming: false,
     toolResultsExpanded: false,
-    rows: [],
-    latestTodos: [],
+    rows: messages.flatMap(rowFromResumedMessage),
+    latestTodos: messages.reduce<TodoViewItem[]>((latestTodos, message) => {
+      const todos = extractTodos(message);
+      return todos.length ? todos : latestTodos;
+    }, []),
   };
 }
 
@@ -111,6 +121,8 @@ export function reduceTuiViewState(state: TuiViewState, action: TuiViewAction): 
     }
     case "toggle_tool_results":
       return { ...state, toolResultsExpanded: !state.toolResultsExpanded };
+    case "toggle_tool_result":
+      return updateToolRow(state, action.toolCallId, (row) => ({ resultExpanded: !row.resultExpanded }));
     case "steer_queued":
       return appendRow(state, { kind: "steering", text: action.text });
     case "next_user_message_display":
@@ -181,16 +193,61 @@ function handleMessageEnd(state: TuiViewState, message: TuiMessageLike): TuiView
 function updateToolRow(
   state: TuiViewState,
   toolCallId: string,
-  patch: Partial<Extract<TuiRow, { kind: "tool" }>>,
+  patch:
+    | Partial<Extract<TuiRow, { kind: "tool" }>>
+    | ((row: Extract<TuiRow, { kind: "tool" }>) => Partial<Extract<TuiRow, { kind: "tool" }>>),
 ): TuiViewState {
   return {
     ...state,
-    rows: state.rows.map((row) => (row.kind === "tool" && row.toolCallId === toolCallId ? { ...row, ...patch } : row)),
+    rows: state.rows.map((row) =>
+      row.kind === "tool" && row.toolCallId === toolCallId
+        ? { ...row, ...(typeof patch === "function" ? patch(row) : patch) }
+        : row,
+    ),
   };
 }
 
 function appendRow(state: TuiViewState, row: TuiRow): TuiViewState {
   return { ...state, rows: [...state.rows, row] };
+}
+
+function rowFromResumedMessage(message: TuiMessageLike): TuiRow[] {
+  if (!isObject(message)) {
+    return [];
+  }
+
+  if (message.role === "user") {
+    const text = textFromMessage(message);
+    return text ? [{ kind: "user", text }] : [];
+  }
+
+  if (message.role === "assistant") {
+    if (
+      (message.stopReason === "error" || message.stopReason === "aborted") &&
+      typeof message.errorMessage === "string"
+    ) {
+      return [{ kind: "assistant", text: message.errorMessage, error: true }];
+    }
+
+    const text = textFromMessage(message);
+    return text ? [{ kind: "assistant", text }] : [];
+  }
+
+  if (message.role === "toolResult" && typeof message.toolCallId === "string" && typeof message.toolName === "string") {
+    return [
+      {
+        kind: "tool",
+        toolCallId: message.toolCallId,
+        toolName: message.toolName,
+        title: summarizeToolTitle(message.toolName),
+        detail: "",
+        status: message.isError ? "error" : "ok",
+        ...formatToolResultView(message),
+      },
+    ];
+  }
+
+  return [];
 }
 
 function clearNextUserMessageDisplay(state: TuiViewState): TuiViewState {
@@ -213,6 +270,10 @@ function formatToolResultView(result: unknown): Pick<
 }
 
 function textFromMessage(message: Record<string, unknown>): string {
+  if (typeof message.content === "string") {
+    return message.content;
+  }
+
   if (!Array.isArray(message.content)) {
     return "";
   }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  createInitialRuntimeViewState,
   createUserTextMessage,
   handleTuiInput,
   shouldSteer,
@@ -20,6 +21,21 @@ describe("tui runtime helpers", () => {
       content: [{ type: "text", text: "focus on tests" }],
       timestamp: expect.any(Number),
     });
+  });
+
+  it("initializes the visible TUI state from resumed agent messages", () => {
+    const agent = createAgent({
+      isStreaming: false,
+      messages: [
+        { role: "user", content: "resume prompt", timestamp: 1 },
+        { role: "assistant", content: [{ type: "text", text: "resume answer" }], timestamp: 2 },
+      ],
+    });
+
+    expect(createInitialRuntimeViewState(agent).rows).toEqual([
+      { kind: "user", text: "resume prompt" },
+      { kind: "assistant", text: "resume answer" },
+    ]);
   });
 
   it("submits idle text as a prompt and saves after the turn", async () => {
@@ -176,10 +192,13 @@ function createOptions(
 }
 
 function createAgent(
-  overrides: Partial<Omit<TuiControllerAgent, "state">> & { isStreaming?: boolean },
+  overrides: Partial<Omit<TuiControllerAgent, "state">> & {
+    isStreaming?: boolean;
+    messages?: TuiControllerAgent["state"]["messages"];
+  },
 ): TuiControllerAgent {
   return {
-    state: { isStreaming: overrides.isStreaming ?? false },
+    state: { isStreaming: overrides.isStreaming ?? false, messages: overrides.messages },
     prompt: overrides.prompt ?? (async () => undefined),
     steer: overrides.steer ?? (() => undefined),
     abort: overrides.abort ?? (() => undefined),

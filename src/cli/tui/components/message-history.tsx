@@ -1,14 +1,36 @@
-import { Box, Text } from "ink";
+import { Box, Text, useBoxMetrics, useInput } from "ink";
+import { useCallback, useEffect, useRef, type RefObject } from "react";
 import type { TuiRow } from "../view-state.js";
 import { tuiTheme } from "../theme.js";
 import { formatAssistantTextBlocks, type AssistantTextSpan } from "../message-format.js";
+import { getAbsoluteLayoutPosition } from "../layout.js";
+import {
+  findToolResultHitTarget,
+  getTerminalRectangle,
+  parseSgrMouseInput,
+  type TerminalRectangle,
+  type ToolResultHitTarget,
+} from "../mouse.js";
 
 export interface MessageHistoryProps {
   rows: readonly TuiRow[];
   toolResultsExpanded?: boolean;
+  onToggleToolResult?: (toolCallId: string) => void;
 }
 
-export function MessageHistory({ rows, toolResultsExpanded = false }: MessageHistoryProps) {
+type ToolRow = Extract<TuiRow, { kind: "tool" }>;
+
+export function MessageHistory({ rows, toolResultsExpanded = false, onToggleToolResult }: MessageHistoryProps) {
+  const toolHitTargetsRef = useRef<ToolResultHitTarget[]>([]);
+  const registerToolResultTarget = useCallback((toolCallId: string, rectangle?: TerminalRectangle) => {
+    toolHitTargetsRef.current = toolHitTargetsRef.current.filter((target) => target.toolCallId !== toolCallId);
+    if (rectangle) {
+      toolHitTargetsRef.current = [...toolHitTargetsRef.current, { toolCallId, rectangle }];
+    }
+  }, []);
+
+  useToolResultMouseToggle(toolHitTargetsRef, onToggleToolResult);
+
   if (rows.length === 0) {
     return null;
   }
@@ -16,13 +38,29 @@ export function MessageHistory({ rows, toolResultsExpanded = false }: MessageHis
   return (
     <Box flexDirection="column" rowGap={1}>
       {rows.map((row, index) => (
-        <MessageRow key={`${row.kind}:${index}`} row={row} toolResultsExpanded={toolResultsExpanded} />
+        <MessageRow
+          key={`${row.kind}:${index}`}
+          row={row}
+          toolResultsExpanded={toolResultsExpanded}
+          onToggleToolResult={onToggleToolResult}
+          registerToolResultTarget={registerToolResultTarget}
+        />
       ))}
     </Box>
   );
 }
 
-function MessageRow({ row, toolResultsExpanded }: { row: TuiRow; toolResultsExpanded: boolean }) {
+function MessageRow({
+  row,
+  toolResultsExpanded,
+  onToggleToolResult,
+  registerToolResultTarget,
+}: {
+  row: TuiRow;
+  toolResultsExpanded: boolean;
+  onToggleToolResult?: (toolCallId: string) => void;
+  registerToolResultTarget: (toolCallId: string, rectangle?: TerminalRectangle) => void;
+}) {
   switch (row.kind) {
     case "user":
       return (
@@ -41,19 +79,13 @@ function MessageRow({ row, toolResultsExpanded }: { row: TuiRow; toolResultsExpa
         </Box>
       );
     case "tool":
-      const result = toolResultsExpanded && row.resultTruncated ? row.fullResult : row.result;
       return (
-        <Box flexDirection="column">
-          <Box columnGap={1}>
-            <Text color={row.status === "error" ? tuiTheme.colors.error : tuiTheme.colors.dim}>
-              {tuiTheme.symbols.tool}
-            </Text>
-            <Text>{row.title}</Text>
-            <Text color={statusColor(row.status)}>{row.status}</Text>
-          </Box>
-          {row.detail ? <Text color={tuiTheme.colors.dim}>  {row.detail}</Text> : null}
-          {result ? <Text color={tuiTheme.colors.dim}>  {result}</Text> : null}
-        </Box>
+        <ToolMessageRow
+          row={row}
+          toolResultsExpanded={toolResultsExpanded}
+          onToggleToolResult={onToggleToolResult}
+          registerToolResultTarget={registerToolResultTarget}
+        />
       );
     case "steering":
       return (
@@ -67,6 +99,104 @@ function MessageRow({ row, toolResultsExpanded }: { row: TuiRow; toolResultsExpa
     default:
       return null;
   }
+}
+
+function ToolMessageRow({
+  row,
+  toolResultsExpanded,
+  onToggleToolResult,
+  registerToolResultTarget,
+}: {
+  row: ToolRow;
+  toolResultsExpanded: boolean;
+  onToggleToolResult?: (toolCallId: string) => void;
+  registerToolResultTarget: (toolCallId: string, rectangle?: TerminalRectangle) => void;
+}) {
+  const rowRef = useRef(null);
+  const metrics = useBoxMetrics(rowRef);
+  const hasResult = Boolean(row.result || row.fullResult);
+  const isPreviewedByDefault = row.toolName === "write_file";
+  const isFoldable = !isPreviewedByDefault && hasResult;
+  const resultExpanded = isFoldable && Boolean(toolResultsExpanded || row.resultExpanded);
+  const result = formatVisibleToolResult(row, { isFoldable, resultExpanded, toolResultsExpanded });
+
+  useEffect(() => {
+    if (!isFoldable || !onToggleToolResult || !metrics.hasMeasured) {
+      registerToolResultTarget(row.toolCallId);
+      return;
+    }
+
+    registerToolResultTarget(
+      row.toolCallId,
+      getTerminalRectangle(getAbsoluteLayoutPosition(rowRef.current), metrics),
+    );
+
+    return () => registerToolResultTarget(row.toolCallId);
+  }, [
+    isFoldable,
+    metrics.hasMeasured,
+    metrics.height,
+    metrics.left,
+    metrics.top,
+    metrics.width,
+    onToggleToolResult,
+    registerToolResultTarget,
+    row.toolCallId,
+  ]);
+
+  return (
+    <Box
+      ref={rowRef}
+      flexDirection="column"
+      aria-role={isFoldable ? "button" : undefined}
+      aria-state={isFoldable ? { expanded: resultExpanded } : undefined}
+    >
+      <Box columnGap={1}>
+        <Text color={row.status === "error" ? tuiTheme.colors.error : tuiTheme.colors.dim}>
+          {isFoldable ? (resultExpanded ? "v" : ">") : tuiTheme.symbols.tool}
+        </Text>
+        <Text>{row.title}</Text>
+        <Text color={statusColor(row.status)}>{row.status}</Text>
+      </Box>
+      {row.detail ? <Text color={tuiTheme.colors.dim}>  {row.detail}</Text> : null}
+      {result ? <Text color={tuiTheme.colors.dim}>  {result}</Text> : null}
+    </Box>
+  );
+}
+
+function formatVisibleToolResult(
+  row: ToolRow,
+  options: { isFoldable: boolean; resultExpanded: boolean; toolResultsExpanded: boolean },
+): string | undefined {
+  if (options.isFoldable) {
+    return options.resultExpanded ? row.fullResult ?? row.result : undefined;
+  }
+
+  if (options.toolResultsExpanded && row.resultTruncated) {
+    return row.fullResult ?? row.result;
+  }
+
+  return row.result;
+}
+
+function useToolResultMouseToggle(
+  toolHitTargetsRef: RefObject<readonly ToolResultHitTarget[]>,
+  onToggleToolResult: ((toolCallId: string) => void) | undefined,
+) {
+  useInput(
+    (input) => {
+      const mouseInput = parseSgrMouseInput(input);
+      if (!mouseInput || mouseInput.button !== "left" || mouseInput.action !== "press") {
+        return;
+      }
+
+      const target = findToolResultHitTarget(toolHitTargetsRef.current, mouseInput);
+      if (target) {
+        onToggleToolResult?.(target.toolCallId);
+      }
+    },
+    { isActive: Boolean(onToggleToolResult) },
+  );
 }
 
 function AssistantMessageText({ text, error }: { text: string; error?: boolean }) {

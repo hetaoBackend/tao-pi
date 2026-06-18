@@ -26,6 +26,7 @@ export interface TuiAppProps {
   onAbort: () => void;
   toolResultsExpanded: boolean;
   onToggleToolResults: () => void;
+  onToggleToolResult: (toolCallId: string) => void;
 }
 
 export function TuiApp({
@@ -45,6 +46,7 @@ export function TuiApp({
   onAbort,
   toolResultsExpanded,
   onToggleToolResults,
+  onToggleToolResult,
 }: TuiAppProps) {
   const nextTodo = todos.find((todo) => todo.status === "in_progress") ?? todos.find((todo) => todo.status === "pending");
 
@@ -59,7 +61,11 @@ export function TuiApp({
         pluginCount={pluginCount}
         projectContextCount={projectContextCount}
       />
-      <MessageHistory rows={rows} toolResultsExpanded={toolResultsExpanded} />
+      <MessageHistory
+        rows={rows}
+        toolResultsExpanded={toolResultsExpanded}
+        onToggleToolResult={onToggleToolResult}
+      />
       <StreamingIndicator streaming={streaming} nextTodo={nextTodo?.content} />
       <TodoPanel todos={todos} streaming={streaming} />
       <InputBox

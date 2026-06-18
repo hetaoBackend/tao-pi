@@ -3,6 +3,51 @@ import { TOOL_RESULT_PREVIEW_CHARS } from "../../../src/cli/tui/message-format.j
 import { createInitialTuiViewState, reduceTuiViewState, selectLatestTodos } from "../../../src/cli/tui/view-state.js";
 
 describe("tui view state", () => {
+  it("creates visible rows from resumed text messages", () => {
+    const state = createInitialTuiViewState([
+      { role: "user", content: "hello from disk", timestamp: 1 },
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "hello back" },
+          { type: "tool-call", toolName: "bash" },
+          { type: "text", text: "second paragraph" },
+        ],
+        timestamp: 2,
+      },
+    ]);
+
+    expect(state.rows).toEqual([
+      { kind: "user", text: "hello from disk" },
+      { kind: "assistant", text: "hello back\nsecond paragraph" },
+    ]);
+  });
+
+  it("creates tool rows from resumed tool result messages", () => {
+    const state = createInitialTuiViewState([
+      {
+        role: "toolResult",
+        toolCallId: "call-1",
+        toolName: "bash",
+        content: [{ type: "text", text: "command output" }],
+        isError: false,
+        timestamp: 1,
+      },
+    ]);
+
+    expect(state.rows).toMatchObject([
+      {
+        kind: "tool",
+        toolCallId: "call-1",
+        toolName: "bash",
+        title: "Run command",
+        result: "command output",
+        fullResult: "command output",
+        status: "ok",
+      },
+    ]);
+  });
+
   it("streams assistant text into one assistant row", () => {
     let state = createInitialTuiViewState();
 
@@ -83,6 +128,35 @@ describe("tui view state", () => {
     ]);
 
     expect(reduceTuiViewState(state, { type: "toggle_tool_results" }).toolResultsExpanded).toBe(true);
+  });
+
+  it("toggles one tool result at a time", () => {
+    let state = createInitialTuiViewState();
+
+    state = reduceTuiViewState(state, {
+      type: "tool_execution_start",
+      toolCallId: "call-1",
+      toolName: "bash",
+      args: { command: "printf one" },
+    });
+    state = reduceTuiViewState(state, {
+      type: "tool_execution_start",
+      toolCallId: "call-2",
+      toolName: "bash",
+      args: { command: "printf two" },
+    });
+
+    const expanded = reduceTuiViewState(state, { type: "toggle_tool_result", toolCallId: "call-1" });
+
+    expect(expanded.rows).toMatchObject([
+      { kind: "tool", toolCallId: "call-1", resultExpanded: true },
+      { kind: "tool", toolCallId: "call-2" },
+    ]);
+    expect(expanded.rows[1]).not.toHaveProperty("resultExpanded", true);
+    expect(reduceTuiViewState(expanded, { type: "toggle_tool_result", toolCallId: "call-1" }).rows).toMatchObject([
+      { kind: "tool", toolCallId: "call-1", resultExpanded: false },
+      { kind: "tool", toolCallId: "call-2" },
+    ]);
   });
 
   it("records steering rows separately from prompt rows", () => {
