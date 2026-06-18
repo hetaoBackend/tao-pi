@@ -53,7 +53,7 @@ async function main(): Promise<void> {
     debugFlag: cliArgs.debug,
     getProviderApiKey: getConfiguredProviderApiKey,
   });
-  const modelLabel = `${config.provider}/${config.modelId}`;
+  const modelLabel = config.modelId;
   const projectContext = await loadProjectContext({ workspaceRoot: config.workspaceRoot });
   const projectContextFiles = projectContext.map((entry) => entry.path);
   const pluginRuntime = createAgentPluginRuntime(
@@ -155,7 +155,6 @@ async function main(): Promise<void> {
         appVersion: APP_VERSION,
         modelLabel,
         sessionId: session.id,
-        sessionMode,
         workspaceRoot: config.workspaceRoot,
         toolNames,
         pluginIds: pluginRuntime.pluginIds,

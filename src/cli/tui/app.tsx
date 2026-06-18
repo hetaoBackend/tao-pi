@@ -13,7 +13,6 @@ export interface TuiAppProps {
   appVersion: string;
   modelLabel: string;
   sessionId: string;
-  sessionMode: "new" | "resumed";
   workspaceRoot: string;
   toolCount: number;
   pluginCount: number;
@@ -33,7 +32,6 @@ export function TuiApp({
   appVersion,
   modelLabel,
   sessionId,
-  sessionMode,
   workspaceRoot,
   toolCount,
   pluginCount,
@@ -56,7 +54,6 @@ export function TuiApp({
         appVersion={appVersion}
         modelLabel={modelLabel}
         sessionId={sessionId}
-        sessionMode={sessionMode}
         workspaceRoot={workspaceRoot}
         toolCount={toolCount}
         pluginCount={pluginCount}
@@ -74,11 +71,9 @@ export function TuiApp({
       />
       <Footer
         modelLabel={modelLabel}
-        sessionMode={sessionMode}
         messageCount={messageCount}
         toolCount={toolCount}
         pluginCount={pluginCount}
-        inputMode={streaming ? "steer" : "prompt"}
       />
     </Box>
   );

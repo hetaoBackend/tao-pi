@@ -5,7 +5,7 @@ describe("cli ui", () => {
   it("renders a compact Claude-style welcome panel with the active context", () => {
     const text = renderWelcome({
       cwd: "/Users/taohe/Documents/tao-pi",
-      modelLabel: "deepseek/ark-code-latest",
+      modelLabel: "ark-code-latest",
       sessionId: "session-123",
       sessionMode: "resumed",
       historyMessages: 4,
@@ -19,7 +19,7 @@ describe("cli ui", () => {
 
     expect(text).toContain("TaoPi");
     expect(text).toContain("cwd      /Users/taohe/Documents/tao-pi");
-    expect(text).toContain("model    deepseek/ark-code-latest");
+    expect(text).toContain("model    ark-code-latest");
     expect(text).toContain("session  session-123 (resumed, 4 messages)");
     expect(text).toContain("tools    todo_read, todo_write, list_files, bash");
     expect(text).toContain("plugins  todo");
@@ -36,7 +36,7 @@ describe("cli ui", () => {
         historyMessages: 0,
         dbPath: ".pi-sessions.sqlite",
         workspaceRoot: "/tmp/project",
-        modelLabel: "openai/gpt-4.1-mini",
+        modelLabel: "gpt-4.1-mini",
         toolNames: ["list_files", "read_file"],
         pluginIds: [],
         projectContextFiles: [],
@@ -47,7 +47,7 @@ describe("cli ui", () => {
         "  id       session-123",
         "  mode     new",
         "  history  0 messages",
-        "  model    openai/gpt-4.1-mini",
+        "  model    gpt-4.1-mini",
         "  db       .pi-sessions.sqlite",
         "  tools    list_files, read_file",
         "  plugins  none",

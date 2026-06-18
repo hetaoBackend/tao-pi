@@ -14,7 +14,6 @@ export interface HeaderProps {
   appVersion: string;
   modelLabel: string;
   sessionId: string;
-  sessionMode: "new" | "resumed";
   workspaceRoot: string;
   toolCount: number;
   pluginCount: number;
@@ -25,7 +24,6 @@ export function Header({
   appVersion,
   modelLabel,
   sessionId,
-  sessionMode,
   workspaceRoot,
   toolCount,
   pluginCount,
@@ -49,9 +47,7 @@ export function Header({
         </Box>
         <Text color={tuiTheme.colors.dim}>{modelLabel}</Text>
         <Text color={tuiTheme.colors.dim}>{workspaceRoot}</Text>
-        <Text color={tuiTheme.colors.dim}>
-          session {sessionId} ({sessionMode})
-        </Text>
+        <Text color={tuiTheme.colors.dim}>session {sessionId}</Text>
         <Text color={tuiTheme.colors.dim}>
           tools {toolCount}  plugins {pluginCount}  context {projectContextCount}
         </Text>

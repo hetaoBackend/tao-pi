@@ -13,9 +13,8 @@ describe("tui components", () => {
     const header = renderToString(
       <Header
         appVersion="0.1.0"
-        modelLabel="openai/gpt-4.1-mini"
+        modelLabel="gpt-4.1-mini"
         sessionId="session-123"
-        sessionMode="new"
         workspaceRoot="/tmp/project"
         toolCount={4}
         pluginCount={2}
@@ -24,12 +23,10 @@ describe("tui components", () => {
     );
     const footer = renderToString(
       <Footer
-        modelLabel="openai/gpt-4.1-mini"
-        sessionMode="new"
+        modelLabel="gpt-4.1-mini"
         messageCount={3}
         toolCount={4}
         pluginCount={2}
-        inputMode="prompt"
       />,
     );
 
@@ -38,11 +35,17 @@ describe("tui components", () => {
     expect(TAOPI_LOGO_LINES.join("\n")).not.toContain("☯");
     expect(header).toContain(TAOPI_LOGO_LINES[0]);
     expect(header).toContain("TaoPi v0.1.0");
-    expect(header).toContain("openai/gpt-4.1-mini");
+    expect(header).toContain("gpt-4.1-mini");
+    expect(header).not.toContain("openai/gpt-4.1-mini");
     expect(header).toContain("/tmp/project");
     expect(header).toContain("session-123");
+    expect(header).not.toContain("(new)");
+    expect(header).not.toContain("undefined");
     expect(footer).toContain("messages 3");
-    expect(footer).toContain("mode prompt");
+    expect(footer).toContain("gpt-4.1-mini");
+    expect(footer).not.toContain("mode");
+    expect(footer).not.toContain("| new |");
+    expect(footer).not.toContain("undefined");
   });
 
   it("renders command picker rows", () => {

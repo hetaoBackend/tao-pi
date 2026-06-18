@@ -37,7 +37,6 @@ export interface RunTuiConversationOptions {
   appVersion: string;
   modelLabel: string;
   sessionId: string;
-  sessionMode: "new" | "resumed";
   workspaceRoot: string;
   toolNames: string[];
   pluginIds: string[];
@@ -179,7 +178,6 @@ function RuntimeApp(options: RunTuiConversationOptions) {
       appVersion={options.appVersion}
       modelLabel={options.modelLabel}
       sessionId={options.sessionId}
-      sessionMode={options.sessionMode}
       workspaceRoot={options.workspaceRoot}
       toolCount={options.toolNames.length}
       pluginCount={options.pluginIds.length}
